@@ -1,0 +1,14 @@
+advent-of-code-2021
+===================
+
+to run tests:
+
+    cargo test
+
+to see available solutions:
+
+    cargo run
+
+to run a solution on an input file:
+
+    cargo run <day> <input_path>
