@@ -1,11 +1,11 @@
-mod day0;
+mod day1;
 
 struct Day {
     name: &'static str,
     run: fn(&str),
 }
 
-static DAYS: &[Day] = &[Day { name: "day0", run: day0::run }];
+static DAYS: &[Day] = &[Day { name: "day1", run: day1::run }];
 
 fn unwrap<T, E: std::fmt::Display>(r: Result<T, E>) -> T {
     r.unwrap_or_else(|e| {
