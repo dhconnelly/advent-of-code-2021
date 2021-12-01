@@ -1,36 +1,23 @@
-mod day;
 mod day0;
 
-const DAYS: &'static [day::Solution] = &[day0::SOLUTION];
-const USAGE: &'static str = "usage: advent-of-code-2021 <day> <input_path>";
+struct Day {
+    name: &'static str,
+    run: fn(&str),
+}
+
+static DAYS: &[Day] = &[Day { name: "day0", run: day0::run }];
+
+fn unwrap<T, E: std::fmt::Display>(r: Result<T, E>) -> T {
+    r.unwrap_or_else(|e| {
+        println!("{}", e);
+        std::process::exit(1);
+    })
+}
 
 fn main() {
-    let mut args = std::env::args().skip(1);
-    let day = args.next().unwrap_or_else(|| {
-        println!("{}\n", USAGE);
-        println!("available days:");
-        for soln in DAYS {
-            println!("   {}", soln.name);
-        }
-        std::process::exit(1);
-    });
-    let soln = DAYS
-        .iter()
-        .find(|soln| soln.name == day)
-        .unwrap_or_else(|| {
-            println!("invalid day: {}", day);
-            std::process::exit(1);
-        });
-    let path = args.next().unwrap_or_else(|| {
-        println!("missing input path");
-        std::process::exit(1);
-    });
-    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| {
-        println!("can't read input: {}", e);
-        std::process::exit(1);
-    });
-    (soln.run)(&text).unwrap_or_else(|e| {
-        println!("failed to execute {}: {}", day, e);
-        std::process::exit(1);
-    });
+    let name = unwrap(std::env::args().nth(1).ok_or("missing day"));
+    let day = unwrap(DAYS.iter().find(|day| day.name == name).ok_or("bad day"));
+    let path = unwrap(std::env::args().nth(2).ok_or("missing input path"));
+    let text = unwrap(std::fs::read_to_string(&path));
+    (day.run)(&text);
 }

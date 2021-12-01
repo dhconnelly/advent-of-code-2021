@@ -1,14 +1,9 @@
-advent-of-code-2021
-===================
+# advent-of-code-2021
 
-to run tests:
-
-    cargo test
-
-to see available solutions:
-
-    cargo run
-
-to run a solution on an input file:
+## usage
 
     cargo run <day> <input_path>
+
+for example:
+
+    cargo run day1 inputs/day1.txt
