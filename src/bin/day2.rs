@@ -94,24 +94,23 @@ up 3
 down 8
 forward 2";
 
-    #[test]
-    fn test_part1() {
-        let cmds = INPUT
+    fn cmds() -> Vec<Command> {
+        INPUT
             .lines()
             .map(str::parse)
             .collect::<Result<Vec<Command>, _>>()
-            .unwrap();
-        let result = part1(&cmds);
+            .unwrap()
+    }
+
+    #[test]
+    fn test_part1() {
+        let result = part1(&cmds());
         assert_eq!(150, result);
     }
 
+    #[test]
     fn test_part2() {
-        let cmds = INPUT
-            .lines()
-            .map(str::parse)
-            .collect::<Result<Vec<Command>, _>>()
-            .unwrap();
-        let result = part2(&cmds);
-        assert_eq!(901, result);
+        let result = part2(&cmds());
+        assert_eq!(900, result);
     }
 }
