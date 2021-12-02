@@ -7,9 +7,8 @@ fn main() {
         .collect::<Result<Vec<Command>, _>>()
         .unwrap();
 
-    let init = Location { pos: 0, depth: 0 };
-    println!("{}", apply(init.clone(), &cmds));
-    println!("{}", apply(State { loc: init.clone(), aim: 0 }, &cmds));
+    println!("{}", apply(Location::default(), &cmds));
+    println!("{}", apply(State::default(), &cmds));
 }
 
 #[derive(Debug)]
@@ -20,30 +19,33 @@ enum Command {
 }
 
 trait Commandable {
-    fn apply(&mut self, cmd: &Command);
+    fn apply(self, cmd: &Command) -> Self;
     fn result(&self) -> i32;
 }
 
-fn apply(mut t: impl Commandable, cmds: &[Command]) -> i32 {
-    for cmd in cmds {
-        t.apply(cmd);
-    }
-    t.result()
+fn apply(t: impl Commandable, cmds: &[Command]) -> i32 {
+    cmds.iter().fold(t, |acc, cmd| acc.apply(cmd)).result()
 }
 
-#[derive(Clone)]
 struct Location {
     pos: i32,
     depth: i32,
 }
 
+impl Location {
+    fn default() -> Self {
+        Location { pos: 0, depth: 0 }
+    }
+}
+
 impl Commandable for Location {
-    fn apply(&mut self, cmd: &Command) {
+    fn apply(mut self, cmd: &Command) -> Self {
         match cmd {
             &Command::Forward(dist) => self.pos += dist,
             &Command::Down(dist) => self.depth += dist,
             &Command::Up(dist) => self.depth -= dist,
-        }
+        };
+        self
     }
 
     fn result(&self) -> i32 {
@@ -56,8 +58,14 @@ struct State {
     aim: i32,
 }
 
+impl State {
+    fn default() -> Self {
+        Self { loc: Location::default(), aim: 0 }
+    }
+}
+
 impl Commandable for State {
-    fn apply(&mut self, cmd: &Command) {
+    fn apply(mut self, cmd: &Command) -> Self {
         match cmd {
             &Command::Forward(dist) => {
                 self.loc.pos += dist;
@@ -65,7 +73,8 @@ impl Commandable for State {
             }
             &Command::Down(dist) => self.aim += dist,
             &Command::Up(dist) => self.aim -= dist,
-        }
+        };
+        self
     }
 
     fn result(&self) -> i32 {
