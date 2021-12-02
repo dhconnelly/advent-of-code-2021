@@ -6,8 +6,10 @@ fn main() {
         .map(str::parse)
         .collect::<Result<Vec<Command>, _>>()
         .unwrap();
-    println!("{}", part1(&cmds));
-    println!("{}", part2(&cmds));
+
+    let init = Location { pos: 0, depth: 0 };
+    println!("{}", apply(init.clone(), &cmds));
+    println!("{}", apply(State { loc: init.clone(), aim: 0 }, &cmds));
 }
 
 #[derive(Debug)]
@@ -17,12 +19,25 @@ enum Command {
     Up(i32),
 }
 
+trait Commandable {
+    fn apply(&mut self, cmd: &Command);
+    fn result(&self) -> i32;
+}
+
+fn apply(mut t: impl Commandable, cmds: &[Command]) -> i32 {
+    for cmd in cmds {
+        t.apply(cmd);
+    }
+    t.result()
+}
+
+#[derive(Clone, Copy)]
 struct Location {
     pos: i32,
     depth: i32,
 }
 
-impl Location {
+impl Commandable for Location {
     fn apply(&mut self, cmd: &Command) {
         match cmd {
             &Command::Forward(dist) => self.pos += dist,
@@ -30,14 +45,10 @@ impl Location {
             &Command::Up(dist) => self.depth -= dist,
         }
     }
-}
 
-fn part1(cmds: &[Command]) -> i32 {
-    let mut loc = Location { pos: 0, depth: 0 };
-    for cmd in cmds {
-        loc.apply(&cmd);
+    fn result(&self) -> i32 {
+        self.pos * self.depth
     }
-    loc.pos * loc.depth
 }
 
 struct State {
@@ -45,7 +56,7 @@ struct State {
     aim: i32,
 }
 
-impl State {
+impl Commandable for State {
     fn apply(&mut self, cmd: &Command) {
         match cmd {
             &Command::Forward(dist) => {
@@ -56,14 +67,10 @@ impl State {
             &Command::Up(dist) => self.aim -= dist,
         }
     }
-}
 
-fn part2(cmds: &[Command]) -> i32 {
-    let mut state = State { loc: Location { pos: 0, depth: 0 }, aim: 0 };
-    for cmd in cmds {
-        state.apply(&cmd);
+    fn result(&self) -> i32 {
+        self.loc.result()
     }
-    state.loc.pos * state.loc.depth
 }
 
 #[derive(Debug)]
@@ -104,13 +111,15 @@ forward 2";
 
     #[test]
     fn test_part1() {
-        let result = part1(&cmds());
+        let init = Location { pos: 0, depth: 0 };
+        let result = apply(init, &cmds());
         assert_eq!(150, result);
     }
 
     #[test]
     fn test_part2() {
-        let result = part2(&cmds());
+        let init = Location { pos: 0, depth: 0 };
+        let result = apply(State { loc: init, aim: 0 }, &cmds());
         assert_eq!(900, result);
     }
 }
