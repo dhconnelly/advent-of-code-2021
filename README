@@ -1,9 +1,11 @@
 # advent-of-code-2021
 
+solutions in rust
+
 ## usage
 
-    cargo run <day> <input_path>
+    cargo run --bin <day> <input_path>
 
 for example:
 
-    cargo run day1 inputs/day1.txt
+    cargo run --bin day1 inputs/day1.txt

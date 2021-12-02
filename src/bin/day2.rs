@@ -31,7 +31,7 @@ fn apply(mut t: impl Commandable, cmds: &[Command]) -> i32 {
     t.result()
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct Location {
     pos: i32,
     depth: i32,
