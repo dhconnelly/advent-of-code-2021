@@ -1,3 +1,15 @@
+fn main() {
+    let path = std::env::args().nth(1).expect("missing input path");
+    let text = std::fs::read_to_string(&path).unwrap();
+    let nums = text
+        .lines()
+        .map(str::parse)
+        .collect::<Result<Vec<i32>, _>>()
+        .unwrap();
+    println!("{}", part1(&nums));
+    println!("{}", part2(&nums));
+}
+
 fn part1(nums: &[i32]) -> usize {
     nums.iter()
         .zip(nums.iter().skip(1))
@@ -13,20 +25,6 @@ fn part2(nums: &[i32]) -> usize {
             w1.iter().sum::<i32>() < w2.iter().sum()
         })
         .count()
-}
-
-fn parse(input: &str) -> Vec<i32> {
-    input
-        .lines()
-        .map(|line| i32::from_str_radix(line, 10))
-        .collect::<Result<_, _>>()
-        .unwrap()
-}
-
-pub fn run(input: &str) {
-    let nums = parse(input);
-    println!("{}", part1(&nums));
-    println!("{}", part2(&nums));
 }
 
 #[cfg(test)]
