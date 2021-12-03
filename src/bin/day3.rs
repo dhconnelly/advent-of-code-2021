@@ -1,4 +1,4 @@
-fn part1(rows: &[&str]) -> u64 {
+fn most_common_bits(rows: &[&str]) -> Vec<u8> {
     let mut counts = vec![0; rows[0].len()];
     for row in rows {
         for (i, bit) in row.chars().enumerate() {
@@ -10,14 +10,22 @@ fn part1(rows: &[&str]) -> u64 {
             .unwrap()
         }
     }
-    let mut gamma = 0;
-    for count in counts {
-        gamma <<= 1;
-        if count > rows.len() / 2 {
-            gamma += 1;
+    let mut most_common = vec![0; rows[0].len()];
+    for (i, count) in counts.iter().enumerate() {
+        if *count > rows.len() / 2 {
+            most_common[i] = 1;
         }
     }
-    let epsilon = !gamma & ((1 << rows[0].len()) - 1);
+    most_common
+}
+
+fn part1(most_common: &[u8]) -> u64 {
+    let mut gamma = 0;
+    for bit in most_common {
+        gamma <<= 1;
+        gamma += *bit as u64;
+    }
+    let epsilon = !gamma & ((1 << most_common.len()) - 1);
     return gamma * epsilon;
 }
 
@@ -25,7 +33,8 @@ fn main() {
     let path = std::env::args().nth(1).expect("missing input path");
     let text = std::fs::read_to_string(&path).unwrap();
     let rows = text.lines().collect::<Vec<&str>>();
-    println!("{}", part1(&rows));
+    let most_common = most_common_bits(&rows);
+    println!("{}", part1(&most_common));
 }
 
 #[cfg(test)]
@@ -48,6 +57,7 @@ mod test {
     #[test]
     fn test_part1() {
         let rows = INPUT.lines().collect::<Vec<&str>>();
-        assert_eq!(198, part1(&rows));
+        let most_common = most_common_bits(&rows);
+        assert_eq!(198, part1(&most_common));
     }
 }
