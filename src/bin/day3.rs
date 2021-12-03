@@ -1,24 +1,18 @@
 fn main() {
     let path = std::env::args().nth(1).expect("missing input path");
     let text = std::fs::read_to_string(&path).unwrap();
-    let width = text.lines().next().unwrap().len();
-    let nums = text
-        .lines()
-        .map(|row| u64::from_str_radix(row, 2).unwrap())
-        .collect::<Vec<u64>>();
-    println!("{}", part1(width, &nums));
-    println!("{}", part2(width, &nums));
+    let rows = text.lines().collect::<Vec<&str>>();
+    println!("{}", part1(&rows));
+    println!("{}", part2(&rows));
 }
 
-fn part1(width: usize, nums: &[u64]) -> u64 {
-    let mut gamma = 0;
-    for bit in most_common_bits(width, nums) {
-        gamma <<= 1;
-        if bit == MostCommon::One {
-            gamma += 1;
-        }
-    }
-    let epsilon = !gamma & ((1 << width) - 1);
+fn part1(rows: &[&str]) -> u64 {
+    let s = (0..rows[0].len()).map(|i| match most_common(i, rows) {
+        MostCommon::One | MostCommon::Tie => '1',
+        MostCommon::Zero => '0',
+    });
+    let gamma = u64::from_str_radix(&s.collect::<String>(), 2).unwrap();
+    let epsilon = !gamma & ((1 << rows[0].len()) - 1);
     return gamma * epsilon;
 }
 
@@ -29,58 +23,43 @@ enum MostCommon {
     One,
 }
 
-fn most_common_bits(width: usize, nums: &[u64]) -> Vec<MostCommon> {
-    let mut one_counts = vec![0; width];
-    for num in nums {
-        for i in 0..width {
-            if num & (1 << (width - i - 1)) > 0 {
-                one_counts[i] += 1;
-            }
-        }
+fn most_common(i: usize, rows: &[&str]) -> MostCommon {
+    let ones = rows.iter().filter(|row| row.as_bytes()[i] == b'1').count();
+    if ones == rows.len() - ones {
+        MostCommon::Tie
+    } else if ones < rows.len() - ones {
+        MostCommon::Zero
+    } else {
+        MostCommon::One
     }
-    let mut most_common = vec![MostCommon::Tie; width];
-    for (i, count) in one_counts.iter().enumerate() {
-        if *count > nums.len() - *count {
-            most_common[i] = MostCommon::One;
-        } else if *count < nums.len() - *count {
-            most_common[i] = MostCommon::Zero;
-        }
-    }
-    most_common
 }
 
-fn part2(width: usize, nums: &[u64]) -> u64 {
-    let oxy = find_num(width, nums.into(), |most_common, bit_index, bit| {
-        match most_common[bit_index] {
-            MostCommon::Tie | MostCommon::One => bit == 1,
-            MostCommon::Zero => bit == 0,
-        }
+fn part2(rows: &[&str]) -> u64 {
+    let s = find_row(rows.into(), |mcb, bit| match mcb {
+        MostCommon::Tie | MostCommon::One => bit == b'1',
+        MostCommon::Zero => bit == b'0',
     });
-    let co2 = find_num(width, nums.into(), |most_common, bit_index, bit| {
-        match most_common[bit_index] {
-            MostCommon::Tie | MostCommon::One => bit == 0,
-            MostCommon::Zero => bit == 1,
-        }
+    let t = find_row(rows.into(), |mcb, bit| match mcb {
+        MostCommon::Tie | MostCommon::One => bit == b'0',
+        MostCommon::Zero => bit == b'1',
     });
+    let oxy = u64::from_str_radix(s, 2).unwrap();
+    let co2 = u64::from_str_radix(t, 2).unwrap();
     oxy * co2
 }
 
-fn find_num(
-    width: usize,
-    mut nums: Vec<u64>,
-    bit_pred: impl Fn(&[MostCommon], usize, u8) -> bool,
-) -> u64 {
-    for i in 0..width {
-        if nums.len() == 1 {
+fn find_row(
+    mut rows: Vec<&str>,
+    bit_pred: impl Fn(MostCommon, u8) -> bool,
+) -> &str {
+    for i in 0..rows[0].len() {
+        if rows.len() == 1 {
             break;
         }
-        let most_common = most_common_bits(width, &nums);
-        nums.retain(|row| {
-            let bit = ((row & (1 << (width - i - 1))) > 0) as bool as u8;
-            bit_pred(&most_common, i, bit)
-        });
+        let mcb = most_common(i, &rows);
+        rows.retain(|row| bit_pred(mcb, row.as_bytes()[i]));
     }
-    *nums.first().unwrap()
+    *rows.first().unwrap()
 }
 
 #[cfg(test)]
@@ -102,21 +81,13 @@ mod test {
 
     #[test]
     fn test_part1() {
-        let width = INPUT.lines().next().unwrap().len();
-        let nums = INPUT
-            .lines()
-            .map(|row| u64::from_str_radix(row, 2).unwrap())
-            .collect::<Vec<u64>>();
-        assert_eq!(198, part1(width, &nums));
+        let rows = INPUT.lines().collect::<Vec<&str>>();
+        assert_eq!(198, part1(&rows));
     }
 
     #[test]
     fn test_part2() {
-        let width = INPUT.lines().next().unwrap().len();
-        let nums = INPUT
-            .lines()
-            .map(|row| u64::from_str_radix(row, 2).unwrap())
-            .collect::<Vec<u64>>();
-        assert_eq!(230, part2(width, &nums));
+        let rows = INPUT.lines().collect::<Vec<&str>>();
+        assert_eq!(230, part2(&rows));
     }
 }
