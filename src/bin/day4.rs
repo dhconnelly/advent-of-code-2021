@@ -8,16 +8,14 @@ type Idx = (usize, usize);
 struct Board {
     tiles: HashMap<Idx, i32>,
     indices: HashMap<i32, Vec<Idx>>,
-    bingo: bool,
     marked: HashSet<Idx>,
+    bingo: bool,
 }
 
 impl Board {
     fn sum_unmarked(&self) -> i32 {
-        self.tiles
-            .iter()
-            .map(|(idx, &val)| if self.marked.contains(idx) { 0 } else { val })
-            .sum()
+        let val_of = |(idx, &n)| if self.marked.contains(idx) { 0 } else { n };
+        self.tiles.iter().map(val_of).sum()
     }
 
     fn has_bingo(&self, (i, j): Idx) -> bool {
@@ -55,32 +53,26 @@ fn play_all(order: Vec<i32>, mut boards: Vec<Board>) -> Vec<i32> {
 
 fn indices_table(tiles: &HashMap<Idx, i32>) -> HashMap<i32, Vec<Idx>> {
     tiles.iter().fold(HashMap::new(), |mut acc, (&idx, &val)| {
-        acc.entry(val).or_insert(vec![]).push(idx);
+        acc.entry(val).or_insert(Vec::new()).push(idx);
         acc
     })
 }
 
+fn atoi(s: &str) -> i32 {
+    i32::from_str_radix(s, 10).unwrap()
+}
+
 fn parse_board(s: &str) -> Board {
-    let tiles = s
-        .split_whitespace()
-        .enumerate()
-        .map(|(i, val)| ((i / COLS, i % COLS), val.parse::<i32>().unwrap()))
-        .collect();
+    let to_tile = |(i, s): (usize, &str)| ((i / COLS, i % COLS), atoi(s));
+    let tiles = s.split_whitespace().enumerate().map(to_tile).collect();
     let indices = indices_table(&tiles);
     Board { tiles, indices, bingo: false, marked: HashSet::new() }
 }
 
-fn parse_order(s: &str) -> Vec<i32> {
-    s.split(',')
-        .map(str::parse)
-        .collect::<Result<Vec<i32>, _>>()
-        .unwrap()
-}
-
 fn parse(s: &str) -> (Vec<i32>, Vec<Board>) {
     let mut segs = s.split("\n\n");
-    let order = parse_order(segs.next().unwrap());
-    let boards = segs.map(parse_board).collect::<Vec<Board>>();
+    let order = segs.next().unwrap().split(',').map(atoi).collect();
+    let boards = segs.map(parse_board).collect();
     (order, boards)
 }
 
