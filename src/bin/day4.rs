@@ -1,74 +1,55 @@
 use std::collections::{HashMap, HashSet};
 
-type Idx = (usize, usize);
-
 const ROWS: usize = 5;
 const COLS: usize = 5;
 
-enum GameState {
-    Continue,
-    Victory,
-}
+type Idx = (usize, usize);
 
 struct Board {
     tiles: HashMap<Idx, i32>,
-    marked: HashSet<Idx>,
     indices: HashMap<i32, Vec<Idx>>,
+    bingo: bool,
+    marked: HashSet<Idx>,
 }
 
 impl Board {
-    fn row_marked(&self, i: usize) -> bool {
-        (0..ROWS).all(|j| self.marked.contains(&(i, j)))
-    }
-
-    fn col_marked(&self, j: usize) -> bool {
-        (0..COLS).all(|i| self.marked.contains(&(i, j)))
-    }
-
     fn sum_unmarked(&self) -> i32 {
         self.tiles
             .iter()
-            .filter(|(idx, _)| !self.marked.contains(idx))
-            .map(|(_, val)| val)
+            .map(|(idx, &val)| if self.marked.contains(idx) { 0 } else { val })
             .sum()
     }
 
-    fn play(&mut self, value: i32) -> GameState {
+    fn has_bingo(&self, (i, j): Idx) -> bool {
+        (0..ROWS).all(|j| self.marked.contains(&(i, j)))
+            || (0..COLS).all(|i| self.marked.contains(&(i, j)))
+    }
+
+    fn play(&mut self, value: i32) {
         if let Some(indices) = self.indices.get(&value) {
-            for &(i, j) in indices {
-                self.marked.insert((i, j));
-            }
-            for &(i, j) in indices {
-                if self.row_marked(i) || self.col_marked(j) {
-                    return GameState::Victory;
-                }
+            self.marked.extend(indices.iter());
+            if indices.iter().any(|idx| self.has_bingo(*idx)) {
+                self.bingo = true;
             }
         }
-        GameState::Continue
     }
 }
 
 fn indices_table(tiles: &HashMap<Idx, i32>) -> HashMap<i32, Vec<Idx>> {
-    let mut table = HashMap::new();
-    for (&(i, j), &val) in tiles.iter() {
-        table.entry(val).or_insert(vec![]).push((i, j));
-    }
-    table
+    tiles.iter().fold(HashMap::new(), |mut acc, (&idx, &val)| {
+        acc.entry(val).or_insert(vec![]).push(idx);
+        acc
+    })
 }
 
 fn parse_board(s: &str) -> Board {
     let tiles = s
-        .lines()
+        .split_whitespace()
         .enumerate()
-        .flat_map(|(i, line)| {
-            line.split_whitespace()
-                .enumerate()
-                .map(move |(j, val)| ((i, j), val.parse::<i32>().unwrap()))
-        })
+        .map(|(i, val)| ((i / COLS, i % COLS), val.parse::<i32>().unwrap()))
         .collect();
     let indices = indices_table(&tiles);
-    let marked = HashSet::new();
-    Board { indices, marked, tiles }
+    Board { tiles, indices, bingo: false, marked: HashSet::new() }
 }
 
 fn parse_order(s: &str) -> Vec<i32> {
@@ -96,7 +77,9 @@ fn play_all(order: Vec<i32>, mut boards: Vec<Board>) -> Vec<i32> {
             if removed.contains(&i) {
                 continue;
             }
-            if let GameState::Victory = boards[i].play(value) {
+            let board = &mut boards[i];
+            board.play(value);
+            if board.bingo {
                 results.push(value * boards[i].sum_unmarked());
                 removed.insert(i);
             }
