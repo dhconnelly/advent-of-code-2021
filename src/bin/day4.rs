@@ -35,6 +35,24 @@ impl Board {
     }
 }
 
+fn play_all(order: Vec<i32>, mut boards: Vec<Board>) -> Vec<i32> {
+    let mut results = Vec::new();
+    let mut removed = HashSet::new();
+    for value in order {
+        for i in 0..boards.len() {
+            if removed.contains(&i) {
+                continue;
+            }
+            boards[i].play(value);
+            if boards[i].bingo {
+                results.push(value * boards[i].sum_unmarked());
+                removed.insert(i);
+            }
+        }
+    }
+    results
+}
+
 fn indices_table(tiles: &HashMap<Idx, i32>) -> HashMap<i32, Vec<Idx>> {
     tiles.iter().fold(HashMap::new(), |mut acc, (&idx, &val)| {
         acc.entry(val).or_insert(vec![]).push(idx);
@@ -64,28 +82,6 @@ fn parse(s: &str) -> (Vec<i32>, Vec<Board>) {
     let order = parse_order(segs.next().unwrap());
     let boards = segs.map(parse_board).collect::<Vec<Board>>();
     (order, boards)
-}
-
-fn play_all(order: Vec<i32>, mut boards: Vec<Board>) -> Vec<i32> {
-    let mut results = Vec::new();
-    let mut removed = HashSet::new();
-    for value in order {
-        if removed.len() == boards.len() {
-            break;
-        }
-        for i in 0..boards.len() {
-            if removed.contains(&i) {
-                continue;
-            }
-            let board = &mut boards[i];
-            board.play(value);
-            if board.bingo {
-                results.push(value * boards[i].sum_unmarked());
-                removed.insert(i);
-            }
-        }
-    }
-    results
 }
 
 fn main() {
