@@ -18,6 +18,16 @@ struct Board {
     indices: IndicesTable,
 }
 
+impl Board {
+    fn play(&mut self, value: i32) {
+        if let Some(indices) = self.indices.get(&value) {
+            for &(i, j) in indices {
+                self.squares[i][j] = Square { value, state: State::Marked };
+            }
+        }
+    }
+}
+
 fn parse_order(s: &str) -> Vec<i32> {
     s.split(',')
         .map(str::parse)
@@ -47,24 +57,17 @@ fn parse_board(s: &str) -> Board {
     Board { squares, indices }
 }
 
-#[derive(Debug)]
-struct Game {
-    order: Vec<i32>,
-    boards: Vec<Board>,
-}
-
-fn parse_game(s: &str) -> Game {
+fn parse(s: &str) -> (Vec<i32>, Vec<Board>) {
     let mut segs = s.split("\n\n");
     let order = parse_order(segs.next().unwrap());
     let boards = segs.map(parse_board).collect::<Vec<Board>>();
-    Game { order, boards }
+    (order, boards)
 }
 
 fn main() {
     let path = std::env::args().nth(1).expect("missing input path");
     let text = std::fs::read_to_string(&path).unwrap();
-    let game = parse_game(&text);
-    println!("game: {:?}", game);
+    let (order, boards) = parse(&text);
 }
 
 #[cfg(test)]
@@ -94,7 +97,11 @@ mod test {
 
     #[test]
     fn test_part1() {
-        let game = parse_game(INPUT);
-        println!("{:?}", game);
+        let (order, mut boards) = parse(INPUT);
+        for value in order {
+            for board in &mut boards {
+                board.play(value);
+            }
+        }
     }
 }
