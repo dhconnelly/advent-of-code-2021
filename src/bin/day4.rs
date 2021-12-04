@@ -85,9 +85,9 @@ fn parse(s: &str) -> (Vec<i32>, Vec<Board>) {
     (order, boards)
 }
 
-fn play_all(order: &[i32], mut boards: Vec<Board>) -> Vec<i32> {
+fn play_all(order: Vec<i32>, mut boards: Vec<Board>) -> Vec<i32> {
     let mut results = Vec::new();
-    let mut removed = std::collections::HashSet::new();
+    let mut removed = HashSet::new();
     for value in order {
         if removed.len() == boards.len() {
             break;
@@ -96,7 +96,7 @@ fn play_all(order: &[i32], mut boards: Vec<Board>) -> Vec<i32> {
             if removed.contains(&i) {
                 continue;
             }
-            if let GameState::Victory = boards[i].play(*value) {
+            if let GameState::Victory = boards[i].play(value) {
                 results.push(value * boards[i].sum_unmarked());
                 removed.insert(i);
             }
@@ -109,8 +109,8 @@ fn main() {
     let path = std::env::args().nth(1).expect("missing input path");
     let text = std::fs::read_to_string(&path).unwrap();
     let (order, boards) = parse(&text);
-    let results = play_all(&order, boards);
-    println!("{}", results[0]);
+    let results = play_all(order, boards);
+    println!("{}", results.first().unwrap());
     println!("{}", results.last().unwrap());
 }
 
@@ -142,14 +142,14 @@ mod test {
     #[test]
     fn test_part1() {
         let (order, boards) = parse(INPUT);
-        let results = play_all(&order, boards);
+        let results = play_all(order, boards);
         assert_eq!(4512, results[0]);
     }
 
     #[test]
     fn test_part2() {
         let (order, boards) = parse(INPUT);
-        let results = play_all(&order, boards);
+        let results = play_all(order, boards);
         assert_eq!(1924, *results.last().unwrap());
     }
 }
