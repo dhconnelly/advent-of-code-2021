@@ -18,13 +18,51 @@ struct Board {
     indices: IndicesTable,
 }
 
+enum GameState {
+    Continue,
+    Victory,
+}
+
 impl Board {
-    fn play(&mut self, value: i32) {
+    fn row_marked(&self, i: usize) -> bool {
+        for sq in &self.squares[i] {
+            if let State::Unmarked = sq.state {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn col_marked(&self, j: usize) -> bool {
+        for row in &self.squares {
+            if let State::Unmarked = row[j].state {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn sum_unmarked(&self) -> i32 {
+        let sq_val = |sq: &Square| match sq.state {
+            State::Marked => 0,
+            State::Unmarked => sq.value,
+        };
+        let row_sum = |row: &Vec<Square>| row.iter().map(sq_val).sum::<i32>();
+        self.squares.iter().map(row_sum).sum()
+    }
+
+    fn play(&mut self, value: i32) -> GameState {
         if let Some(indices) = self.indices.get(&value) {
             for &(i, j) in indices {
                 self.squares[i][j] = Square { value, state: State::Marked };
             }
+            for &(i, j) in indices {
+                if self.row_marked(i) || self.col_marked(j) {
+                    return GameState::Victory;
+                }
+            }
         }
+        GameState::Continue
     }
 }
 
@@ -64,10 +102,24 @@ fn parse(s: &str) -> (Vec<i32>, Vec<Board>) {
     (order, boards)
 }
 
+fn part1(order: &[i32], mut boards: Vec<Board>) -> i32 {
+    let mut result = 0;
+    'outer: for value in order {
+        for board in &mut boards {
+            if let GameState::Victory = board.play(*value) {
+                result = value * board.sum_unmarked();
+                break 'outer;
+            }
+        }
+    }
+    result
+}
+
 fn main() {
     let path = std::env::args().nth(1).expect("missing input path");
     let text = std::fs::read_to_string(&path).unwrap();
     let (order, boards) = parse(&text);
+    println!("{}", part1(&order, boards));
 }
 
 #[cfg(test)]
@@ -82,13 +134,13 @@ mod test {
     21  9 14 16  7
      6 10  3 18  5
      1 12 20 15 19
-    
+
      3 15  0  2 22
      9 18 13 17  5
     19  8  7 25 23
     20 11 10 24  4
     14 21 16 12  6
-    
+
     14 21 17 24  4
     10 16 15  9 19
     18  8 23 26 20
@@ -97,11 +149,7 @@ mod test {
 
     #[test]
     fn test_part1() {
-        let (order, mut boards) = parse(INPUT);
-        for value in order {
-            for board in &mut boards {
-                board.play(value);
-            }
-        }
+        let (order, boards) = parse(INPUT);
+        assert_eq!(4512, part1(&order, boards));
     }
 }
