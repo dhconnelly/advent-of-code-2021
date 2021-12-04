@@ -10,9 +10,12 @@ struct Square {
     state: State,
 }
 
+type IndicesTable = std::collections::HashMap<i32, Vec<(usize, usize)>>;
+
 #[derive(Debug)]
 struct Board {
     squares: Vec<Vec<Square>>,
+    indices: IndicesTable,
 }
 
 fn parse_order(s: &str) -> Vec<i32> {
@@ -20,6 +23,16 @@ fn parse_order(s: &str) -> Vec<i32> {
         .map(str::parse)
         .collect::<Result<Vec<i32>, _>>()
         .unwrap()
+}
+
+fn indices_table(squares: &Vec<Vec<Square>>) -> IndicesTable {
+    let mut table = IndicesTable::new();
+    for (i, row) in squares.iter().enumerate() {
+        for (j, sq) in row.iter().enumerate() {
+            table.entry(sq.value).or_default().push((i, j));
+        }
+    }
+    table
 }
 
 fn parse_board(s: &str) -> Board {
@@ -30,7 +43,8 @@ fn parse_board(s: &str) -> Board {
     let parse_line =
         |line: &str| line.split_whitespace().map(parse_tok).collect();
     let squares = s.lines().map(parse_line).collect();
-    Board { squares }
+    let indices = indices_table(&squares);
+    Board { squares, indices }
 }
 
 #[derive(Debug)]
