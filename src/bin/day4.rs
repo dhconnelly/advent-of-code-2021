@@ -1,60 +1,42 @@
-#[derive(Debug)]
-enum State {
-    Unmarked,
-    Marked,
-}
+use std::collections::{HashMap, HashSet};
 
-#[derive(Debug)]
-struct Square {
-    value: i32,
-    state: State,
-}
+type Idx = (usize, usize);
 
-type IndicesTable = std::collections::HashMap<i32, Vec<(usize, usize)>>;
-
-#[derive(Debug)]
-struct Board {
-    squares: Vec<Vec<Square>>,
-    indices: IndicesTable,
-}
+const ROWS: usize = 5;
+const COLS: usize = 5;
 
 enum GameState {
     Continue,
     Victory,
 }
 
+struct Board {
+    tiles: HashMap<Idx, i32>,
+    marked: HashSet<Idx>,
+    indices: HashMap<i32, Vec<Idx>>,
+}
+
 impl Board {
     fn row_marked(&self, i: usize) -> bool {
-        for sq in &self.squares[i] {
-            if let State::Unmarked = sq.state {
-                return false;
-            }
-        }
-        true
+        (0..ROWS).all(|j| self.marked.contains(&(i, j)))
     }
 
     fn col_marked(&self, j: usize) -> bool {
-        for row in &self.squares {
-            if let State::Unmarked = row[j].state {
-                return false;
-            }
-        }
-        true
+        (0..COLS).all(|i| self.marked.contains(&(i, j)))
     }
 
     fn sum_unmarked(&self) -> i32 {
-        let sq_val = |sq: &Square| match sq.state {
-            State::Marked => 0,
-            State::Unmarked => sq.value,
-        };
-        let row_sum = |row: &Vec<Square>| row.iter().map(sq_val).sum::<i32>();
-        self.squares.iter().map(row_sum).sum()
+        self.tiles
+            .iter()
+            .filter(|(idx, _)| !self.marked.contains(idx))
+            .map(|(_, val)| val)
+            .sum()
     }
 
     fn play(&mut self, value: i32) -> GameState {
         if let Some(indices) = self.indices.get(&value) {
             for &(i, j) in indices {
-                self.squares[i][j] = Square { value, state: State::Marked };
+                self.marked.insert((i, j));
             }
             for &(i, j) in indices {
                 if self.row_marked(i) || self.col_marked(j) {
@@ -66,33 +48,34 @@ impl Board {
     }
 }
 
-fn parse_order(s: &str) -> Vec<i32> {
-    s.split(',')
-        .map(str::parse)
-        .collect::<Result<Vec<i32>, _>>()
-        .unwrap()
-}
-
-fn indices_table(squares: &Vec<Vec<Square>>) -> IndicesTable {
-    let mut table = IndicesTable::new();
-    for (i, row) in squares.iter().enumerate() {
-        for (j, sq) in row.iter().enumerate() {
-            table.entry(sq.value).or_default().push((i, j));
-        }
+fn indices_table(tiles: &HashMap<Idx, i32>) -> HashMap<i32, Vec<Idx>> {
+    let mut table = HashMap::new();
+    for (&(i, j), &val) in tiles.iter() {
+        table.entry(val).or_insert(vec![]).push((i, j));
     }
     table
 }
 
 fn parse_board(s: &str) -> Board {
-    let parse_tok = |tok: &str| Square {
-        value: tok.parse().unwrap(),
-        state: State::Unmarked,
-    };
-    let parse_line =
-        |line: &str| line.split_whitespace().map(parse_tok).collect();
-    let squares = s.lines().map(parse_line).collect();
-    let indices = indices_table(&squares);
-    Board { squares, indices }
+    let tiles = s
+        .lines()
+        .enumerate()
+        .flat_map(|(i, line)| {
+            line.split_whitespace()
+                .enumerate()
+                .map(move |(j, val)| ((i, j), val.parse::<i32>().unwrap()))
+        })
+        .collect();
+    let indices = indices_table(&tiles);
+    let marked = HashSet::new();
+    Board { indices, marked, tiles }
+}
+
+fn parse_order(s: &str) -> Vec<i32> {
+    s.split(',')
+        .map(str::parse)
+        .collect::<Result<Vec<i32>, _>>()
+        .unwrap()
 }
 
 fn parse(s: &str) -> (Vec<i32>, Vec<Board>) {
