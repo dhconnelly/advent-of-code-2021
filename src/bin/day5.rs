@@ -8,30 +8,28 @@ fn slope(l: &Line) -> Pt {
     (dx, dy)
 }
 
-fn apply_line(l: &Line, g: &mut Grid) {
+fn steps(l: &Line) -> i32 {
+    (l.1 .0 - l.0 .0).abs().max((l.1 .1 - l.0 .1).abs())
+}
+
+fn apply_line(g: Grid, l: &Line) -> Grid {
     let d = slope(l);
-    let mut pt = l.0;
-    while pt != l.1 {
+    (0..=steps(l)).fold(g, |mut g, i| {
+        let pt = (l.0 .0 + i * d.0, l.0 .1 + i * d.1);
         *g.entry(pt).or_default() += 1;
-        pt = (pt.0 + d.0, pt.1 + d.1);
-    }
-    *g.entry(pt).or_default() += 1;
+        g
+    })
 }
 
 fn part1(lines: &[Line]) -> usize {
-    let mut g = Grid::new();
-    for line in lines.iter().filter(|l| l.0 .1 == l.1 .1 || l.0 .0 == l.1 .0) {
-        apply_line(line, &mut g);
-    }
-    g.values().filter(|count| **count > 1).count()
+    let filter = |l: &&Line| l.0 .1 == l.1 .1 || l.0 .0 == l.1 .0;
+    let grid = lines.iter().filter(filter).fold(Grid::new(), apply_line);
+    grid.values().filter(|count| **count > 1).count()
 }
 
 fn part2(lines: &[Line]) -> usize {
-    let mut g = Grid::new();
-    for line in lines.iter() {
-        apply_line(line, &mut g);
-    }
-    g.values().filter(|count| **count > 1).count()
+    let grid = lines.iter().fold(Grid::new(), apply_line);
+    grid.values().filter(|count| **count > 1).count()
 }
 
 fn atoi(s: &str) -> i32 {
