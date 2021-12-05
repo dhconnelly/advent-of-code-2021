@@ -2,43 +2,13 @@ type Pt = (i32, i32);
 type Line = (Pt, Pt);
 type Grid = std::collections::HashMap<Pt, i32>;
 
-fn atoi(s: &str) -> i32 {
-    s.parse().unwrap()
-}
-
-fn parse_line(s: &str) -> Line {
-    let (from, to) = s.split_once(" -> ").unwrap();
-    let (from_x, from_y) = from.split_once(',').unwrap();
-    let (to_x, to_y) = to.split_once(',').unwrap();
-    ((atoi(from_x), atoi(from_y)), (atoi(to_x), atoi(to_y)))
-}
-
-fn is_horiz(l: &Line) -> bool {
-    l.0 .1 == l.1 .1
-}
-
-fn is_vert(l: &Line) -> bool {
-    l.0 .0 == l.1 .0
-}
-
 fn slope(l: &Line) -> Pt {
-    if is_horiz(l) {
-        if l.1 .0 - l.0 .0 > 0 {
-            (1, 0)
-        } else {
-            (-1, 0)
-        }
-    } else {
-        if l.1 .1 - l.0 .1 > 0 {
-            (0, 1)
-        } else {
-            (0, -1)
-        }
-    }
+    let dx = (l.1 .0 - l.0 .0).signum();
+    let dy = (l.1 .1 - l.0 .1).signum();
+    (dx, dy)
 }
 
 fn apply_line(l: &Line, g: &mut Grid) {
-    assert!(is_horiz(l) || is_vert(l));
     let d = slope(l);
     let mut pt = l.0;
     while pt != l.1 {
@@ -50,10 +20,29 @@ fn apply_line(l: &Line, g: &mut Grid) {
 
 fn part1(lines: &[Line]) -> usize {
     let mut g = Grid::new();
-    for line in lines.iter().filter(|l| is_horiz(l) || is_vert(l)) {
+    for line in lines.iter().filter(|l| l.0 .1 == l.1 .1 || l.0 .0 == l.1 .0) {
         apply_line(line, &mut g);
     }
     g.values().filter(|count| **count > 1).count()
+}
+
+fn part2(lines: &[Line]) -> usize {
+    let mut g = Grid::new();
+    for line in lines.iter() {
+        apply_line(line, &mut g);
+    }
+    g.values().filter(|count| **count > 1).count()
+}
+
+fn atoi(s: &str) -> i32 {
+    s.parse().unwrap()
+}
+
+fn parse_line(s: &str) -> Line {
+    let (from, to) = s.split_once(" -> ").unwrap();
+    let (from_x, from_y) = from.split_once(',').unwrap();
+    let (to_x, to_y) = to.split_once(',').unwrap();
+    ((atoi(from_x), atoi(from_y)), (atoi(to_x), atoi(to_y)))
 }
 
 fn parse_lines(s: &str) -> Vec<Line> {
@@ -65,6 +54,7 @@ fn main() {
     let text = std::fs::read_to_string(&path).unwrap();
     let lines = parse_lines(&text);
     println!("{:?}", part1(&lines));
+    println!("{:?}", part2(&lines));
 }
 
 #[cfg(test)]
@@ -86,5 +76,11 @@ mod test {
     fn test_part1() {
         let lines = parse_lines(INPUT);
         assert_eq!(5, part1(&lines));
+    }
+
+    #[test]
+    fn test_part2() {
+        let lines = parse_lines(INPUT);
+        assert_eq!(12, part2(&lines));
     }
 }
