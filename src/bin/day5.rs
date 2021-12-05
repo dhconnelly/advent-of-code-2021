@@ -21,15 +21,13 @@ fn apply_line(g: Grid, l: &Line) -> Grid {
     })
 }
 
-fn part1(lines: &[Line]) -> usize {
-    let filter = |l: &&Line| l.0 .1 == l.1 .1 || l.0 .0 == l.1 .0;
-    let grid = lines.iter().filter(filter).fold(Grid::new(), apply_line);
-    grid.values().filter(|count| **count > 1).count()
+fn not_diag(l: &&Line) -> bool {
+    l.0 .1 == l.1 .1 || l.0 .0 == l.1 .0
 }
 
-fn part2(lines: &[Line]) -> usize {
-    let grid = lines.iter().fold(Grid::new(), apply_line);
-    grid.values().filter(|count| **count > 1).count()
+fn intersections(lines: &[Line], filter: impl Fn(&&Line) -> bool) -> usize {
+    let grid = lines.iter().filter(filter).fold(Grid::new(), apply_line);
+    grid.values().filter(|&&count| count > 1).count()
 }
 
 fn atoi(s: &str) -> i32 {
@@ -51,8 +49,8 @@ fn main() {
     let path = std::env::args().nth(1).expect("missing input path");
     let text = std::fs::read_to_string(&path).unwrap();
     let lines = parse_lines(&text);
-    println!("{:?}", part1(&lines));
-    println!("{:?}", part2(&lines));
+    println!("{:?}", intersections(&lines, not_diag));
+    println!("{:?}", intersections(&lines, |_| true));
 }
 
 #[cfg(test)]
@@ -73,12 +71,12 @@ mod test {
     #[test]
     fn test_part1() {
         let lines = parse_lines(INPUT);
-        assert_eq!(5, part1(&lines));
+        assert_eq!(5, intersections(&lines, not_diag));
     }
 
     #[test]
     fn test_part2() {
         let lines = parse_lines(INPUT);
-        assert_eq!(12, part2(&lines));
+        assert_eq!(12, intersections(&lines, |_| true));
     }
 }
