@@ -12,15 +12,15 @@ fn step(fish: &mut [i64], next_fish: &mut [i64]) {
         next_fish[i - 1] = fish[i];
     }
     next_fish[6] += fish[0];
+    for i in 0..fish.len() {
+        fish[i] = next_fish[i];
+    }
 }
 
 fn simulate(mut fish: Vec<i64>, steps: usize) -> i64 {
     let mut next_fish = vec![0; fish.len()];
     for _ in 0..steps {
         step(&mut fish, &mut next_fish);
-        for i in 0..fish.len() {
-            fish[i] = next_fish[i];
-        }
     }
     fish.iter().sum::<i64>()
 }
