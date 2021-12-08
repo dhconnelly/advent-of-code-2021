@@ -8,7 +8,7 @@ impl Digit {
         self.0.count_ones()
     }
 
-    fn contains(&self, other: &Digit) -> bool {
+    fn contains(self, other: Digit) -> bool {
         self.0 & other.0 == other.0
     }
 }
@@ -29,9 +29,9 @@ fn parse(line: &str) -> Entry {
     Entry { input, output }
 }
 
-fn assign(entry: &Entry) -> HashMap<Digit, i32> {
+fn assign(entry: &Entry) -> HashMap<Digit, usize> {
     let mut map = HashMap::new();
-    let mut rev = HashMap::new();
+    let mut rev = [Digit(0); 10];
 
     // pass 1: unique signal lengths
     for digit in entry.input.iter() {
@@ -43,7 +43,7 @@ fn assign(entry: &Entry) -> HashMap<Digit, i32> {
             _ => continue,
         };
         map.insert(*digit, val);
-        rev.insert(val, *digit);
+        rev[val] = *digit;
     }
 
     // pass 2: unique based on first pass
@@ -52,14 +52,14 @@ fn assign(entry: &Entry) -> HashMap<Digit, i32> {
             continue;
         }
         let val = match digit.len() {
-            6 if digit.contains(rev.get(&4).unwrap()) => 9,
-            6 if digit.contains(rev.get(&1).unwrap()) => 0,
+            6 if digit.contains(rev[4]) => 9,
+            6 if digit.contains(rev[1]) => 0,
             6 => 6,
-            5 if digit.contains(rev.get(&1).unwrap()) => 3,
+            5 if digit.contains(rev[1]) => 3,
             _ => continue,
         };
         map.insert(*digit, val);
-        rev.insert(val, *digit);
+        rev[val] = *digit;
     }
 
     // pass 3: distinguish 2 vs. 5 with second pass info
@@ -67,21 +67,21 @@ fn assign(entry: &Entry) -> HashMap<Digit, i32> {
         if map.contains_key(digit) {
             continue;
         }
-        let val = if rev.get(&6).unwrap().contains(digit) { 5 } else { 2 };
+        let val = if rev[6].contains(*digit) { 5 } else { 2 };
         map.insert(*digit, val);
     }
 
     map
 }
 
-fn entry_value(entry: &Entry) -> i32 {
+fn entry_value(entry: &Entry) -> usize {
     let map = assign(&entry);
     let digit_value = |digit: &Digit| map.get(digit).unwrap().to_string();
     let output_value: String = entry.output.iter().map(digit_value).collect();
     output_value.parse().unwrap()
 }
 
-fn part2(entries: &[Entry]) -> i32 {
+fn part2(entries: &[Entry]) -> usize {
     entries.iter().map(entry_value).sum()
 }
 
