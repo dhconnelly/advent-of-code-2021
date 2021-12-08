@@ -32,20 +32,21 @@ fn parse(line: &str) -> Entry {
 fn assign(entry: &Entry) -> HashMap<Digit, i32> {
     let mut map = HashMap::new();
     let mut rev = HashMap::new();
+
+    // pass 1: unique signal lengths
     for digit in entry.input.iter() {
         let val = match digit.len() {
-            2 => Some(1),
-            4 => Some(4),
-            3 => Some(7),
-            7 => Some(8),
-            _ => None,
+            2 => 1,
+            4 => 4,
+            3 => 7,
+            7 => 8,
+            _ => continue,
         };
-        if let Some(val) = val {
-            map.insert(*digit, val);
-            rev.insert(val, *digit);
-        }
+        map.insert(*digit, val);
+        rev.insert(val, *digit);
     }
 
+    // pass 2: unique based on first pass
     for digit in entry.input.iter() {
         if map.contains_key(digit) {
             continue;
@@ -61,6 +62,7 @@ fn assign(entry: &Entry) -> HashMap<Digit, i32> {
         rev.insert(val, *digit);
     }
 
+    // pass 3: distinguish 2 vs. 5 with second pass info
     for digit in entry.input.iter() {
         if map.contains_key(digit) {
             continue;
