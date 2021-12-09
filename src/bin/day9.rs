@@ -6,7 +6,7 @@ type Grid = HashMap<Pt, i32>;
 fn is_low_point(g: &Grid, &(i, j): &Pt) -> bool {
     let val = g.get(&(i, j)).unwrap();
     [(i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)]
-        .into_iter()
+        .iter()
         .all(|nbr| !g.contains_key(&nbr) || g.get(&nbr).unwrap() > val)
 }
 
@@ -22,8 +22,7 @@ fn explore(g: &Grid, pt @ &(i, j): &Pt, v: &mut HashSet<Pt>) -> i32 {
     let val = *g.get(pt).unwrap();
     v.insert(*pt);
     for nbr in &[(i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)] {
-        if g.contains_key(nbr) {
-            let nbr_val = *g.get(nbr).unwrap();
+        if let Some(&nbr_val) = g.get(nbr) {
             if !v.contains(nbr) && nbr_val != 9 && nbr_val > val {
                 explore(g, nbr, v);
             }
