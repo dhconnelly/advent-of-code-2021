@@ -1,11 +1,5 @@
 fn pair_match(a: char, b: char) -> bool {
-    match (a, b) {
-        ('(', ')') => true,
-        ('[', ']') => true,
-        ('{', '}') => true,
-        ('<', '>') => true,
-        _ => false,
-    }
+    matches!((a, b), ('(', ')') | ('[', ']') | ('{', '}') | ('<', '>'))
 }
 
 fn score_invalid(ch: char) -> i64 {
