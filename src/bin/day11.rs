@@ -10,8 +10,7 @@ fn step(grid: &mut Grid) -> usize {
     let mut steps = 0;
     let mut q = Vec::from_iter(grid.keys().copied());
     while let Some(pt) = q.pop() {
-        if grid.contains_key(&pt) {
-            let val = grid.get_mut(&pt).unwrap();
+        if let Some(val) = grid.get_mut(&pt) {
             *val += 1;
             if *val == 10 {
                 q.extend(nbrs(pt));
@@ -19,7 +18,7 @@ fn step(grid: &mut Grid) -> usize {
             }
         }
     }
-    grid.values_mut().filter(|&&mut val| val > 9).for_each(|val| *val = 0);
+    grid.values_mut().filter(|val| **val > 9).for_each(|val| *val = 0);
     steps
 }
 
