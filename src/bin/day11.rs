@@ -24,7 +24,7 @@ fn step(grid: &mut Grid) -> usize {
 }
 
 fn part1(mut grid: Grid) -> usize {
-    (0..100).fold(0, |acc, _| acc + step(&mut grid))
+    (0..100).map(|_| step(&mut grid)).sum()
 }
 
 fn part2(mut grid: Grid) -> usize {
