@@ -1,13 +1,12 @@
-use std::collections::HashMap;
-
-type Graph<'a> = HashMap<&'a str, Vec<&'a str>>;
+type Graph<'a> = std::collections::HashMap<&'a str, Vec<&'a str>>;
+type Counter<'a> = std::collections::HashMap<&'a str, usize>;
 
 fn explore<'a>(
-    g: &'a Graph,
-    v: &mut HashMap<&'a str, usize>,
+    g: &Graph<'a>,
+    v: &mut Counter<'a>,
     from: &'a str,
     to: &'a str,
-    can_visit: impl Fn(&str, &HashMap<&str, usize>) -> bool + Copy,
+    can_visit: &impl Fn(&str, &Counter) -> bool,
 ) -> usize {
     let mut paths = 0;
     for &nbr in g.get(from).unwrap() {
@@ -26,18 +25,16 @@ fn is_uppercase(s: &str) -> bool {
     s.chars().all(char::is_uppercase)
 }
 
+fn count_paths(g: &Graph, f: &impl Fn(&str, &Counter) -> bool) -> usize {
+    explore(g, &mut Counter::from([("start", 1)]), "start", "end", f)
+}
+
 fn part1(g: &Graph) -> usize {
-    let mut v = HashMap::new();
-    v.insert("start", 1);
-    explore(g, &mut v, "start", "end", |s, v| {
-        *v.get(s).unwrap_or(&0) == 0 || is_uppercase(s)
-    })
+    count_paths(g, &|s, v| *v.get(s).unwrap_or(&0) == 0 || is_uppercase(s))
 }
 
 fn part2(g: &Graph) -> usize {
-    let mut v = HashMap::new();
-    v.insert("start", 1);
-    explore(g, &mut v, "start", "end", |s, v| {
+    count_paths(g, &|s, v| {
         if is_uppercase(s) || v.get(s).unwrap_or(&0) == &0 {
             return true;
         }
