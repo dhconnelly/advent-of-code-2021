@@ -5,9 +5,9 @@ type Graph<'a> = HashMap<&'a str, Vec<&'a str>>;
 fn explore<'a>(
     g: &'a Graph,
     v: &mut HashMap<&'a str, usize>,
-    can_visit: impl Fn(&str, &HashMap<&str, usize>) -> bool + Copy,
     from: &'a str,
     to: &'a str,
+    can_visit: impl Fn(&str, &HashMap<&str, usize>) -> bool + Copy,
 ) -> usize {
     let mut paths = 0;
     for &nbr in g.get(from).unwrap() {
@@ -15,7 +15,7 @@ fn explore<'a>(
             paths += 1;
         } else if can_visit(nbr, v) {
             *v.entry(nbr).or_default() += 1;
-            paths += explore(g, v, can_visit, nbr, to);
+            paths += explore(g, v, nbr, to, can_visit);
             *v.entry(nbr).or_default() -= 1;
         }
     }
@@ -27,27 +27,24 @@ fn is_uppercase(s: &str) -> bool {
 }
 
 fn part1(g: &Graph) -> usize {
-    let can_visit = |s: &str, v: &HashMap<&str, usize>| {
-        *v.get(s).unwrap_or(&0) == 0 || is_uppercase(s)
-    };
     let mut v = HashMap::new();
     v.insert("start", 1);
-    explore(g, &mut v, can_visit, "start", "end")
+    explore(g, &mut v, "start", "end", |s, v| {
+        *v.get(s).unwrap_or(&0) == 0 || is_uppercase(s)
+    })
 }
 
 fn part2(g: &Graph) -> usize {
-    let can_visit_twice = |s: &str, v: &HashMap<&str, usize>| {
-        s != "start"
-            && s != "end"
-            && !is_uppercase(s)
-            && v.iter().all(|(s, &n)| is_uppercase(s) || n < 2)
-    };
-    let can_visit = |s: &str, v: &HashMap<&str, usize>| {
-        *v.get(s).unwrap_or(&0) == 0 || is_uppercase(s) || can_visit_twice(s, v)
-    };
     let mut v = HashMap::new();
     v.insert("start", 1);
-    explore(g, &mut v, can_visit, "start", "end")
+    explore(g, &mut v, "start", "end", |s, v| {
+        if is_uppercase(s) || v.get(s).unwrap_or(&0) == &0 {
+            return true;
+        }
+        // visit one small room twice
+        let mut lowercase = v.iter().filter(|(s, _)| !is_uppercase(s));
+        s != "start" && s != "end" && lowercase.all(|(_, &n)| n < 2)
+    })
 }
 
 fn parse(s: &str) -> Graph {
