@@ -16,7 +16,7 @@ fn explore<'a>(
         } else if can_visit(nbr, v) {
             *v.entry(nbr).or_default() += 1;
             paths += explore(g, v, can_visit, nbr, to);
-            v.get_mut(nbr).map(|n| *n -= 1);
+            *v.entry(nbr).or_default() -= 1;
         }
     }
     paths
