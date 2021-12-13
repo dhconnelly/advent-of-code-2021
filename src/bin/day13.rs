@@ -22,9 +22,13 @@ impl Grid {
         self.dots.remove(&pt);
     }
 
-    fn flip_all(&mut self, pts: &[Pt], fold: Pt) {
-        for pt in pts {
-            self.flip(*pt, fold);
+    fn fold(&mut self, fold: Pt) {
+        let should_flip =
+            |(x, y)| fold.0 > 0 && x > fold.0 || fold.1 > 0 && y > fold.1;
+        let to_flip: Vec<Pt> =
+            self.dots.iter().filter(|&&pt| should_flip(pt)).copied().collect();
+        for pt in to_flip {
+            self.flip(pt, fold);
         }
         self.height = if fold.1 > 0 { fold.1 } else { self.height };
         self.width = if fold.0 > 0 { fold.0 } else { self.width };
@@ -42,16 +46,6 @@ impl fmt::Display for Grid {
         }
         Ok(())
     }
-}
-
-fn apply(grid: &mut Grid, fold: Pt) {
-    let to_flip: Vec<Pt> = grid
-        .dots
-        .iter()
-        .filter(|&&(x, y)| fold.0 > 0 && x > fold.0 || fold.1 > 0 && y > fold.1)
-        .copied()
-        .collect();
-    grid.flip_all(&to_flip, fold);
 }
 
 fn parse(s: &str) -> (Grid, Vec<Pt>) {
@@ -76,9 +70,9 @@ fn main() {
     let path = std::env::args().nth(1).expect("missing input path");
     let text = std::fs::read_to_string(&path).unwrap();
     let (mut grid, folds) = parse(&text);
-    apply(&mut grid, folds[0]);
+    grid.fold(folds[0]);
     println!("{}", grid.dots.len());
-    folds[1..].iter().for_each(|&fold| apply(&mut grid, fold));
+    folds[1..].iter().for_each(|&fold| grid.fold(fold));
     println!("{}", grid);
 }
 
@@ -111,7 +105,7 @@ mod test {
     #[test]
     fn test_part1() {
         let (mut grid, folds) = parse(INPUT);
-        apply(&mut grid, folds[0]);
+        grid.fold(folds[0]);
         assert_eq!(17, grid.dots.len());
     }
 }
