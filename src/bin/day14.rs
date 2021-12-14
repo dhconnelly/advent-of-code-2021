@@ -1,30 +1,44 @@
 use std::collections::HashMap;
 
 type Pair = (u8, u8);
+type Freqs = HashMap<u8, i64>;
 
-fn expand_find_frequences(
+fn merge(a: Freqs, b: Freqs) -> Freqs {
+    b.iter().fold(a, |mut acc, (&k, v)| {
+        *acc.entry(k).or_default() += v;
+        acc
+    })
+}
+
+fn expand_freqs(
     input @ (left, right): Pair,
     rules: &HashMap<Pair, u8>,
     n: usize,
-    freqs: &mut HashMap<u8, usize>,
-) {
+    memo: &mut HashMap<(Pair, usize), Freqs>,
+) -> Freqs {
     if n == 0 {
-        return;
+        return HashMap::new();
+    }
+    if let Some(freqs) = memo.get(&(input, n)) {
+        return freqs.clone();
     }
     let &mid = rules.get(&input).unwrap();
+    let mut freqs = expand_freqs((left, mid), rules, n - 1, memo);
     *freqs.entry(mid).or_default() += 1;
-    expand_find_frequences((left, mid), rules, n - 1, freqs);
-    expand_find_frequences((mid, right), rules, n - 1, freqs);
+    let freqs = merge(freqs, expand_freqs((mid, right), rules, n - 1, memo));
+    memo.insert((input, n), freqs.clone());
+    freqs
 }
 
-fn solve(input: &str, rules: &HashMap<Pair, u8>, n: usize) -> usize {
+fn solve(input: &str, rules: &HashMap<Pair, u8>, n: usize) -> i64 {
     let mut freqs = HashMap::new();
     for ch in input.as_bytes() {
         *freqs.entry(*ch).or_default() += 1;
     }
+    let mut memo = HashMap::new();
     for i in 0..input.len() - 1 {
         let s = input[i..i + 2].as_bytes();
-        expand_find_frequences((s[0], s[1]), rules, n, &mut freqs);
+        freqs = merge(freqs, expand_freqs((s[0], s[1]), rules, n, &mut memo));
     }
     let most_common = freqs.values().max().unwrap();
     let least_common = freqs.values().min().unwrap();
@@ -48,7 +62,7 @@ fn main() {
     let text = std::fs::read_to_string(&path).unwrap();
     let (input, rules) = parse(&text);
     println!("{}", solve(&input, &rules, 10));
-    //println!("{}", solve(&input, &rules, 40));
+    println!("{}", solve(&input, &rules, 40));
 }
 
 #[cfg(test)]
