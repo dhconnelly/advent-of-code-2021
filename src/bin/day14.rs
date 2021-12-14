@@ -1,48 +1,44 @@
 use std::collections::HashMap;
 
-fn frequencies(s: &str) -> HashMap<char, usize> {
-    s.chars().fold(HashMap::new(), |mut acc, ch| {
-        *acc.entry(ch).or_insert(0) += 1;
-        acc
-    })
+type Pair = (u8, u8);
+
+fn expand_find_frequences(
+    input @ (left, right): Pair,
+    rules: &HashMap<Pair, u8>,
+    n: usize,
+    freqs: &mut HashMap<u8, usize>,
+) {
+    if n == 0 {
+        return;
+    }
+    let &mid = rules.get(&input).unwrap();
+    *freqs.entry(mid).or_default() += 1;
+    expand_find_frequences((left, mid), rules, n - 1, freqs);
+    expand_find_frequences((mid, right), rules, n - 1, freqs);
 }
 
-fn apply(input: String, rules: &mut HashMap<String, String>) -> String {
-    if input.len() == 1 {
-        return input;
+fn solve(input: &str, rules: &HashMap<Pair, u8>, n: usize) -> usize {
+    let mut freqs = HashMap::new();
+    for ch in input.as_bytes() {
+        *freqs.entry(*ch).or_default() += 1;
     }
-    if let Some(output) = rules.get(&input) {
-        return output.to_string();
+    for i in 0..input.len() - 1 {
+        let s = input[i..i + 2].as_bytes();
+        expand_find_frequences((s[0], s[1]), rules, n, &mut freqs);
     }
-    let x = input.len() / 2;
-    let (l, m, r) = (&input[..x], &input[x - 1..x + 1], &input[x..]);
-    let (l, r) = (apply(l.to_string(), rules), apply(r.to_string(), rules));
-    let cx = rules.get(m).unwrap().as_bytes()[1] as char;
-    let output = format!("{}{}{}", l, cx, r);
-    rules.insert(input.to_string(), output.clone());
-    output
-}
-
-fn solve(input: &str, rules: &mut HashMap<String, String>, n: usize) -> usize {
-    let output = (0..n).fold(input.to_string(), |s, _| apply(s, rules));
-    let freqs = frequencies(&output);
     let most_common = freqs.values().max().unwrap();
     let least_common = freqs.values().min().unwrap();
     most_common - least_common
 }
 
-fn parse(s: &str) -> (String, HashMap<String, String>) {
+fn parse(s: &str) -> (String, HashMap<Pair, u8>) {
     let mut lines = s.lines();
     let input = lines.next().unwrap().trim().to_string();
     lines.next().unwrap();
     let rules = lines
         .map(|line| line.split_once(" -> ").unwrap())
-        .map(|(s, t)| {
-            let s = s.trim();
-            let (sb, tb) = (s.as_bytes(), t.trim().as_bytes());
-            let (a, b, c) = (sb[0] as char, tb[0] as char, sb[1] as char);
-            (s.to_string(), format!("{}{}{}", a, b, c))
-        })
+        .map(|(s, t)| (s.trim().as_bytes(), t.trim().as_bytes()))
+        .map(|(s, t)| ((s[0], s[1]), t[0]))
         .collect();
     (input, rules)
 }
@@ -50,9 +46,9 @@ fn parse(s: &str) -> (String, HashMap<String, String>) {
 fn main() {
     let path = std::env::args().nth(1).expect("missing input path");
     let text = std::fs::read_to_string(&path).unwrap();
-    let (input, mut rules) = parse(&text);
-    println!("{}", solve(&input, &mut rules, 10));
-    //println!("{}", solve(&input, &mut rules, 40));
+    let (input, rules) = parse(&text);
+    println!("{}", solve(&input, &rules, 10));
+    //println!("{}", solve(&input, &rules, 40));
 }
 
 #[cfg(test)]
@@ -80,9 +76,9 @@ mod test {
 
     #[test]
     fn test_part1() {
-        let (input, mut rules) = parse(INPUT);
+        let (input, rules) = parse(INPUT);
         println!("{}, {:?}", input, rules);
-        assert_eq!(1588, solve(&input, &mut rules, 10));
-        //assert_eq!(2188189693529, solve(&input, &mut rules, 40));
+        assert_eq!(1588, solve(&input, &rules, 10));
+        assert_eq!(2188189693529, solve(&input, &rules, 40));
     }
 }
