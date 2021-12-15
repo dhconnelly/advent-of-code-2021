@@ -3,6 +3,7 @@ use std::collections::{BinaryHeap, HashMap};
 type Pt = (i32, i32);
 type Graph = std::collections::HashMap<Pt, u8>;
 
+// https://doc.rust-lang.org/std/collections/binary_heap/index.html
 #[derive(Eq, PartialEq)]
 struct Node {
     pt: Pt,
@@ -27,21 +28,21 @@ fn nbrs((r, c): Pt) -> impl Iterator<Item = Pt> {
         .map(move |(dr, dc)| (r + dr, c + dc))
 }
 
-fn shortest_path(graph: &Graph, from: Pt, to: Pt) -> i64 {
+fn shortest_path(graph: &Graph, from: Pt, to: Pt) -> Option<i64> {
     let mut dists: HashMap<&Pt, i64> =
         graph.iter().map(|(pt, _)| (pt, std::i64::MAX)).collect();
     let mut q = BinaryHeap::new();
     q.push(Node { pt: from, dist: 0 });
-    while let Some(first) = q.pop() {
-        if first.pt == to {
-            return first.dist;
+    while let Some(Node { pt, dist }) = q.pop() {
+        if pt == to {
+            return Some(dist);
         }
-        if first.dist > *dists.get(&first.pt).unwrap() {
+        if dist > *dists.get(&pt).unwrap() {
             continue;
         }
-        for nbr in nbrs(first.pt) {
+        for nbr in nbrs(pt) {
             if let Some(nbr_val) = graph.get(&nbr) {
-                let nbr_dist = first.dist + *nbr_val as i64;
+                let nbr_dist = dist + *nbr_val as i64;
                 if nbr_dist < *dists.get(&nbr).unwrap() {
                     q.push(Node { pt: nbr, dist: nbr_dist });
                     *dists.get_mut(&nbr).unwrap() = nbr_dist;
@@ -49,7 +50,7 @@ fn shortest_path(graph: &Graph, from: Pt, to: Pt) -> i64 {
             }
         }
     }
-    panic!();
+    None
 }
 
 fn min_risk(graph: &Graph) -> i64 {
@@ -58,7 +59,7 @@ fn min_risk(graph: &Graph) -> i64 {
         *graph.keys().map(|(row, _)| row).max().unwrap(),
         *graph.keys().map(|(_, col)| col).max().unwrap(),
     );
-    shortest_path(&graph, from, to)
+    shortest_path(&graph, from, to).unwrap()
 }
 
 fn inc_round(mut val: u8, i: u8, j: u8) -> u8 {
