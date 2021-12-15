@@ -52,13 +52,45 @@ fn shortest_path(graph: &Graph, from: Pt, to: Pt) -> i64 {
     panic!();
 }
 
-fn part1(graph: &Graph) -> i64 {
+fn min_risk(graph: &Graph) -> i64 {
     let from = (0, 0);
     let to = (
         *graph.keys().map(|(row, _)| row).max().unwrap(),
         *graph.keys().map(|(_, col)| col).max().unwrap(),
     );
     shortest_path(&graph, from, to)
+}
+
+fn inc_round(mut val: u8, i: u8, j: u8) -> u8 {
+    for _ in 0..i {
+        val += 1;
+        if val == 10 {
+            val = 1;
+        }
+    }
+    for _ in 0..j {
+        val += 1;
+        if val == 10 {
+            val = 1;
+        }
+    }
+    val
+}
+
+fn expand(graph: &Graph) -> Graph {
+    let mut expanded = Graph::new();
+    let height = graph.keys().map(|(r, _)| r).max().unwrap() + 1;
+    let width = graph.keys().map(|(_, c)| c).max().unwrap() + 1;
+    for i in 0..5 {
+        for j in 0..5 {
+            for (&(row, col), &val) in graph.iter() {
+                let row = i * height + row;
+                let col = j * width + col;
+                expanded.insert((row, col), inc_round(val, i as u8, j as u8));
+            }
+        }
+    }
+    expanded
 }
 
 fn parse(s: &str) -> Graph {
@@ -77,8 +109,6 @@ fn main() {
     let path = std::env::args().nth(1).expect("missing input path");
     let text = std::fs::read_to_string(&path).unwrap();
     let graph = parse(&text);
-    for kv in graph.iter() {
-        println!("{:?}", kv);
-    }
-    println!("{}", part1(&graph));
+    println!("{}", min_risk(&graph));
+    println!("{}", min_risk(&expand(&graph)));
 }
