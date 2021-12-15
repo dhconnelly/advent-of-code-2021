@@ -3,7 +3,6 @@ use std::collections::{BinaryHeap, HashMap};
 type Pt = (i32, i32);
 type Graph = std::collections::HashMap<Pt, u8>;
 
-// https://doc.rust-lang.org/std/collections/binary_heap/index.html
 #[derive(Eq, PartialEq)]
 struct Node {
     pt: Pt,
@@ -63,19 +62,8 @@ fn min_risk(graph: &Graph) -> i64 {
 }
 
 fn inc_round(mut val: u8, i: u8, j: u8) -> u8 {
-    for _ in 0..i {
-        val += 1;
-        if val == 10 {
-            val = 1;
-        }
-    }
-    for _ in 0..j {
-        val += 1;
-        if val == 10 {
-            val = 1;
-        }
-    }
-    val
+    val = (0..i).fold(val, |val, _| if val + 1 == 10 { 1 } else { val + 1 });
+    (0..j).fold(val, |val, _| if val + 1 == 10 { 1 } else { val + 1 })
 }
 
 fn expand(graph: &Graph) -> Graph {
@@ -95,15 +83,12 @@ fn expand(graph: &Graph) -> Graph {
 }
 
 fn parse(s: &str) -> Graph {
-    s.lines()
-        .enumerate()
-        .flat_map(|(row, line)| {
-            line.trim()
-                .bytes()
-                .enumerate()
-                .map(move |(col, ch)| ((row as i32, col as i32), ch - b'0'))
+    s.lines().enumerate().fold(Graph::new(), |acc, (row, line)| {
+        line.trim().bytes().enumerate().fold(acc, |mut acc, (col, ch)| {
+            acc.insert((row as i32, col as i32), ch - b'0');
+            acc
         })
-        .collect()
+    })
 }
 
 fn main() {
