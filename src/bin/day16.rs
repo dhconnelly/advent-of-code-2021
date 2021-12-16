@@ -36,7 +36,7 @@ struct Packet {
 #[derive(Debug)]
 enum Payload {
     Literal(u64),
-    Operation(Vec<Packet>),
+    Operation(u64, Vec<Packet>),
 }
 
 fn parse_literal(bits: &mut BitStream) -> u64 {
@@ -75,7 +75,7 @@ fn parse_packet(bits: &mut BitStream) -> Packet {
     let type_id = bits.read_num(3);
     let payload = match type_id {
         4 => Payload::Literal(parse_literal(bits)),
-        _ => Payload::Operation(parse_op(bits)),
+        _ => Payload::Operation(type_id, parse_op(bits)),
     };
     Packet { version, payload }
 }
@@ -84,10 +84,38 @@ fn version_sum(packet: &Packet) -> u64 {
     packet.version
         + match &packet.payload {
             Payload::Literal(_) => 0,
-            Payload::Operation(packets) => {
+            Payload::Operation(_, packets) => {
                 packets.iter().map(version_sum).sum()
             }
         }
+}
+
+fn btoi(b: bool) -> u64 {
+    if b {
+        1
+    } else {
+        0
+    }
+}
+
+fn eval_op(op: u64, packets: &[Packet]) -> u64 {
+    match op {
+        0 => packets.iter().map(eval).sum(),
+        1 => packets.iter().map(eval).product(),
+        2 => packets.iter().map(eval).min().unwrap(),
+        3 => packets.iter().map(eval).max().unwrap(),
+        5 => btoi(eval(&packets[0]) > eval(&packets[1])),
+        6 => btoi(eval(&packets[0]) < eval(&packets[1])),
+        7 => btoi(eval(&packets[0]) == eval(&packets[1])),
+        _ => panic!(),
+    }
+}
+
+fn eval(packet: &Packet) -> u64 {
+    match &packet.payload {
+        Payload::Literal(value) => *value,
+        Payload::Operation(op, packets) => eval_op(*op, &packets),
+    }
 }
 
 fn main() {
@@ -96,4 +124,5 @@ fn main() {
     let bits = parse_bits(&text);
     let packet = parse_packet(&mut BitStream::new(bits));
     println!("{}", version_sum(&packet));
+    println!("{}", eval(&packet));
 }
