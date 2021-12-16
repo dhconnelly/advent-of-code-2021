@@ -90,23 +90,15 @@ fn version_sum(packet: &Packet) -> u64 {
         }
 }
 
-fn btoi(b: bool) -> u64 {
-    if b {
-        1
-    } else {
-        0
-    }
-}
-
 fn eval_op(op: u64, packets: &[Packet]) -> u64 {
     match op {
         0 => packets.iter().map(eval).sum(),
         1 => packets.iter().map(eval).product(),
         2 => packets.iter().map(eval).min().unwrap(),
         3 => packets.iter().map(eval).max().unwrap(),
-        5 => btoi(eval(&packets[0]) > eval(&packets[1])),
-        6 => btoi(eval(&packets[0]) < eval(&packets[1])),
-        7 => btoi(eval(&packets[0]) == eval(&packets[1])),
+        5 => (eval(&packets[0]) > eval(&packets[1])) as u64,
+        6 => (eval(&packets[0]) < eval(&packets[1])) as u64,
+        7 => (eval(&packets[0]) == eval(&packets[1])) as u64,
         _ => panic!(),
     }
 }
