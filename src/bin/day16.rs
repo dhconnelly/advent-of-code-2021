@@ -45,64 +45,67 @@ enum Payload {
     Eq(Vec<Packet>),
 }
 
-fn parse_literal(bits: &mut BitStream) -> u64 {
-    let mut val = 0;
-    let mut done = false;
-    while !done {
-        done = bits.read_num(1) == 0;
-        val = (val << 4) | bits.read_num(4);
-    }
-    val
-}
-
 #[derive(Debug)]
 enum Error {
     InvalidTypeId(u64),
     InvalidLengthTypeId(u64),
 }
 
-fn parse_packets_by_count(
-    count: u64,
-    bits: &mut BitStream,
-) -> Result<Vec<Packet>, Error> {
-    (0..count).map(|_| parse_packet(bits)).collect()
+struct PacketParser {
+    bits: BitStream,
 }
 
-fn parse_packets_by_len(
-    len: usize,
-    bits: &mut BitStream,
-) -> Result<Vec<Packet>, Error> {
-    let start = bits.i;
-    let mut packets = Vec::new();
-    while bits.i < start + len {
-        packets.push(parse_packet(bits)?);
+impl PacketParser {
+    fn parse_literal(&mut self) -> u64 {
+        let mut val = 0;
+        let mut done = false;
+        while !done {
+            done = self.bits.read_num(1) == 0;
+            val = (val << 4) | self.bits.read_num(4);
+        }
+        val
     }
-    Ok(packets)
-}
 
-fn parse_packets(bits: &mut BitStream) -> Result<Vec<Packet>, Error> {
-    match bits.read_num(1) {
-        0 => parse_packets_by_len(bits.read_num(15) as usize, bits),
-        1 => parse_packets_by_count(bits.read_num(11), bits),
-        n => Err(Error::InvalidLengthTypeId(n)),
+    fn parse_packets_by_count(&mut self) -> Result<Vec<Packet>, Error> {
+        let count = self.bits.read_num(11);
+        (0..count).map(|_| self.parse_packet()).collect()
     }
-}
 
-fn parse_packet(bits: &mut BitStream) -> Result<Packet, Error> {
-    let version = bits.read_num(3);
-    let type_id = bits.read_num(3);
-    let payload = match type_id {
-        0 => Payload::Add(parse_packets(bits)?),
-        1 => Payload::Mul(parse_packets(bits)?),
-        2 => Payload::Min(parse_packets(bits)?),
-        3 => Payload::Max(parse_packets(bits)?),
-        4 => Payload::Literal(parse_literal(bits)),
-        5 => Payload::Gt(parse_packets(bits)?),
-        6 => Payload::Lt(parse_packets(bits)?),
-        7 => Payload::Eq(parse_packets(bits)?),
-        n => return Err(Error::InvalidTypeId(n)),
-    };
-    Ok(Packet { version, payload })
+    fn parse_packets_by_len(&mut self) -> Result<Vec<Packet>, Error> {
+        let len = self.bits.read_num(15) as usize;
+        let start = self.bits.i;
+        let mut packets = Vec::new();
+        while self.bits.i < start + len {
+            packets.push(self.parse_packet()?);
+        }
+        Ok(packets)
+    }
+
+    fn parse_packets(&mut self) -> Result<Vec<Packet>, Error> {
+        let length_type_id = self.bits.read_num(1);
+        match length_type_id {
+            0 => self.parse_packets_by_len(),
+            1 => self.parse_packets_by_count(),
+            n => Err(Error::InvalidLengthTypeId(n)),
+        }
+    }
+
+    fn parse_packet(&mut self) -> Result<Packet, Error> {
+        let version = self.bits.read_num(3);
+        let type_id = self.bits.read_num(3);
+        let payload = match type_id {
+            0 => Payload::Add(self.parse_packets()?),
+            1 => Payload::Mul(self.parse_packets()?),
+            2 => Payload::Min(self.parse_packets()?),
+            3 => Payload::Max(self.parse_packets()?),
+            4 => Payload::Literal(self.parse_literal()),
+            5 => Payload::Gt(self.parse_packets()?),
+            6 => Payload::Lt(self.parse_packets()?),
+            7 => Payload::Eq(self.parse_packets()?),
+            n => return Err(Error::InvalidTypeId(n)),
+        };
+        Ok(Packet { version, payload })
+    }
 }
 
 fn version_sum(packet: &Packet) -> u64 {
@@ -132,11 +135,16 @@ fn eval(packet: &Packet) -> u64 {
     }
 }
 
+fn parse(bits: BitStream) -> Result<Packet, Error> {
+    let mut parser = PacketParser { bits };
+    parser.parse_packet()
+}
+
 fn main() {
     let path = std::env::args().nth(1).expect("missing input path");
     let text = std::fs::read_to_string(&path).unwrap();
     let bits = parse_bits(&text).unwrap();
-    let packet = parse_packet(&mut BitStream::new(bits)).unwrap();
+    let packet = parse(BitStream::new(bits)).unwrap();
     println!("{}", version_sum(&packet));
     println!("{}", eval(&packet));
 }
