@@ -98,3 +98,29 @@ fn main() {
     println!("{}", min_risk(&graph));
     println!("{}", min_risk(&expand(&graph)));
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    static INPUT: &'static str = "1163751742
+1381373672
+2136511328
+3694931569
+7463417111
+1319128137
+1359912421
+3125421639
+1293138521
+2311944581";
+
+    #[test]
+    fn test_part1() {
+        assert_eq!(40, min_risk(&parse(&INPUT)));
+    }
+
+    #[test]
+    fn test_part2() {
+        assert_eq!(315, min_risk(&expand(&parse(&INPUT))));
+    }
+}
