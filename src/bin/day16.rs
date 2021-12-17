@@ -1,12 +1,12 @@
-fn parse_bits(s: &str) -> String {
+fn parse_bits(s: &str) -> Result<String, std::num::ParseIntError> {
     let s = s.trim();
-    (0..s.len())
-        .map(|i| u8::from_str_radix(&s[i..i + 1], 16).unwrap())
-        .flat_map(|x| {
-            [0b1000 & x, 0b0100 & x, 0b0010 & x, 0b0001 & x].into_iter()
-        })
+    let v = (0..s.len())
+        .map(|i| u8::from_str_radix(&s[i..i + 1], 16))
+        .collect::<Result<Vec<u8>, _>>()?;
+    Ok(v.iter()
+        .flat_map(|x| [0b1000 & x, 0b0100 & x, 0b0010 & x, 0b0001 & x])
         .map(|bit| if bit > 0 { "1" } else { "0" })
-        .collect()
+        .collect())
 }
 
 struct BitStream {
@@ -36,7 +36,13 @@ struct Packet {
 #[derive(Debug)]
 enum Payload {
     Literal(u64),
-    Operation(u64, Vec<Packet>),
+    Add(Vec<Packet>),
+    Mul(Vec<Packet>),
+    Min(Vec<Packet>),
+    Max(Vec<Packet>),
+    Gt(Vec<Packet>),
+    Lt(Vec<Packet>),
+    Eq(Vec<Packet>),
 }
 
 fn parse_literal(bits: &mut BitStream) -> u64 {
@@ -49,72 +55,88 @@ fn parse_literal(bits: &mut BitStream) -> u64 {
     val
 }
 
-fn parse_packets_count(count: u64, bits: &mut BitStream) -> Vec<Packet> {
+#[derive(Debug)]
+enum Error {
+    InvalidTypeId(u64),
+    InvalidLengthTypeId(u64),
+}
+
+fn parse_packets_by_count(
+    count: u64,
+    bits: &mut BitStream,
+) -> Result<Vec<Packet>, Error> {
     (0..count).map(|_| parse_packet(bits)).collect()
 }
 
-fn parse_packets_len(len: usize, bits: &mut BitStream) -> Vec<Packet> {
+fn parse_packets_by_len(
+    len: usize,
+    bits: &mut BitStream,
+) -> Result<Vec<Packet>, Error> {
     let start = bits.i;
     let mut packets = Vec::new();
     while bits.i < start + len {
-        packets.push(parse_packet(bits));
+        packets.push(parse_packet(bits)?);
     }
-    packets
+    Ok(packets)
 }
 
-fn parse_op(bits: &mut BitStream) -> Vec<Packet> {
+fn parse_packets(bits: &mut BitStream) -> Result<Vec<Packet>, Error> {
     match bits.read_num(1) {
-        0 => parse_packets_len(bits.read_num(15) as usize, bits),
-        1 => parse_packets_count(bits.read_num(11), bits),
-        _ => panic!(),
+        0 => parse_packets_by_len(bits.read_num(15) as usize, bits),
+        1 => parse_packets_by_count(bits.read_num(11), bits),
+        n => Err(Error::InvalidLengthTypeId(n)),
     }
 }
 
-fn parse_packet(bits: &mut BitStream) -> Packet {
+fn parse_packet(bits: &mut BitStream) -> Result<Packet, Error> {
     let version = bits.read_num(3);
     let type_id = bits.read_num(3);
     let payload = match type_id {
+        0 => Payload::Add(parse_packets(bits)?),
+        1 => Payload::Mul(parse_packets(bits)?),
+        2 => Payload::Min(parse_packets(bits)?),
+        3 => Payload::Max(parse_packets(bits)?),
         4 => Payload::Literal(parse_literal(bits)),
-        _ => Payload::Operation(type_id, parse_op(bits)),
+        5 => Payload::Gt(parse_packets(bits)?),
+        6 => Payload::Lt(parse_packets(bits)?),
+        7 => Payload::Eq(parse_packets(bits)?),
+        n => return Err(Error::InvalidTypeId(n)),
     };
-    Packet { version, payload }
+    Ok(Packet { version, payload })
 }
 
 fn version_sum(packet: &Packet) -> u64 {
-    packet.version
-        + match &packet.payload {
-            Payload::Literal(_) => 0,
-            Payload::Operation(_, packets) => {
-                packets.iter().map(version_sum).sum()
-            }
-        }
-}
-
-fn eval_op(op: u64, packets: &[Packet]) -> u64 {
-    match op {
-        0 => packets.iter().map(eval).sum(),
-        1 => packets.iter().map(eval).product(),
-        2 => packets.iter().map(eval).min().unwrap(),
-        3 => packets.iter().map(eval).max().unwrap(),
-        5 => (eval(&packets[0]) > eval(&packets[1])) as u64,
-        6 => (eval(&packets[0]) < eval(&packets[1])) as u64,
-        7 => (eval(&packets[0]) == eval(&packets[1])) as u64,
-        _ => panic!(),
-    }
+    let sub_sum = match &packet.payload {
+        Payload::Literal(_) => 0,
+        Payload::Add(packets)
+        | Payload::Mul(packets)
+        | Payload::Max(packets)
+        | Payload::Min(packets)
+        | Payload::Gt(packets)
+        | Payload::Lt(packets)
+        | Payload::Eq(packets) => packets.iter().map(version_sum).sum(),
+    };
+    sub_sum + packet.version
 }
 
 fn eval(packet: &Packet) -> u64 {
     match &packet.payload {
         Payload::Literal(value) => *value,
-        Payload::Operation(op, packets) => eval_op(*op, &packets),
+        Payload::Add(packets) => packets.iter().map(eval).sum(),
+        Payload::Mul(packets) => packets.iter().map(eval).product(),
+        Payload::Max(packets) => packets.iter().map(eval).max().unwrap(),
+        Payload::Min(packets) => packets.iter().map(eval).min().unwrap(),
+        Payload::Gt(packets) => (eval(&packets[0]) > eval(&packets[1])) as u64,
+        Payload::Lt(packets) => (eval(&packets[0]) < eval(&packets[1])) as u64,
+        Payload::Eq(packets) => (eval(&packets[0]) == eval(&packets[1])) as u64,
     }
 }
 
 fn main() {
     let path = std::env::args().nth(1).expect("missing input path");
     let text = std::fs::read_to_string(&path).unwrap();
-    let bits = parse_bits(&text);
-    let packet = parse_packet(&mut BitStream::new(bits));
+    let bits = parse_bits(&text).unwrap();
+    let packet = parse_packet(&mut BitStream::new(bits)).unwrap();
     println!("{}", version_sum(&packet));
     println!("{}", eval(&packet));
 }
