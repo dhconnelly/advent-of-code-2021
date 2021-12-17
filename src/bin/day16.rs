@@ -1,14 +1,23 @@
+#[derive(Debug)]
+enum Error {
+    EofError,
+    InvalidTypeId(u64),
+    InvalidLengthTypeId(u64),
+}
+
 struct BitStream {
     i: usize,
     bits: String,
 }
 
 impl BitStream {
-    fn eat_num(&mut self, width: usize) -> u64 {
-        assert!(self.i + width <= self.bits.len());
+    fn eat_num(&mut self, width: usize) -> Result<u64, Error> {
+        if self.i + width > self.bits.len() {
+            return Err(Error::EofError);
+        }
         let s = &self.bits[self.i..self.i + width];
         self.i += width;
-        u64::from_str_radix(s, 2).unwrap()
+        Ok(u64::from_str_radix(s, 2).unwrap())
     }
 }
 
@@ -16,10 +25,10 @@ impl std::str::FromStr for BitStream {
     type Err = std::num::ParseIntError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s.trim();
-        let v = (0..s.len())
+        let bytes = (0..s.len())
             .map(|i| u8::from_str_radix(&s[i..i + 1], 16))
             .collect::<Result<Vec<u8>, _>>()?;
-        let bits = v
+        let bits = bytes
             .iter()
             .flat_map(|x| [0b1000 & x, 0b0100 & x, 0b0010 & x, 0b0001 & x])
             .map(|bit| if bit > 0 { "1" } else { "0" })
@@ -46,34 +55,28 @@ enum Payload {
     Eq(Vec<Packet>),
 }
 
-#[derive(Debug)]
-enum Error {
-    InvalidTypeId(u64),
-    InvalidLengthTypeId(u64),
-}
-
 struct PacketParser {
     bits: BitStream,
 }
 
 impl PacketParser {
-    fn parse_literal(&mut self) -> u64 {
+    fn parse_literal(&mut self) -> Result<u64, Error> {
         let mut val = 0;
         let mut done = false;
         while !done {
-            done = self.bits.eat_num(1) == 0;
-            val = (val << 4) | self.bits.eat_num(4);
+            done = self.bits.eat_num(1)? == 0;
+            val = (val << 4) | self.bits.eat_num(4)?;
         }
-        val
+        Ok(val)
     }
 
     fn parse_packets_by_count(&mut self) -> Result<Vec<Packet>, Error> {
-        let count = self.bits.eat_num(11);
+        let count = self.bits.eat_num(11)?;
         (0..count).map(|_| self.parse_packet()).collect()
     }
 
     fn parse_packets_by_len(&mut self) -> Result<Vec<Packet>, Error> {
-        let len = self.bits.eat_num(15) as usize;
+        let len = self.bits.eat_num(15)? as usize;
         let start = self.bits.i;
         let mut packets = Vec::new();
         while self.bits.i < start + len {
@@ -83,7 +86,7 @@ impl PacketParser {
     }
 
     fn parse_packets(&mut self) -> Result<Vec<Packet>, Error> {
-        let length_type_id = self.bits.eat_num(1);
+        let length_type_id = self.bits.eat_num(1)?;
         match length_type_id {
             0 => self.parse_packets_by_len(),
             1 => self.parse_packets_by_count(),
@@ -92,14 +95,14 @@ impl PacketParser {
     }
 
     fn parse_packet(&mut self) -> Result<Packet, Error> {
-        let version = self.bits.eat_num(3);
-        let type_id = self.bits.eat_num(3);
+        let version = self.bits.eat_num(3)?;
+        let type_id = self.bits.eat_num(3)?;
         let payload = match type_id {
             0 => Payload::Add(self.parse_packets()?),
             1 => Payload::Mul(self.parse_packets()?),
             2 => Payload::Min(self.parse_packets()?),
             3 => Payload::Max(self.parse_packets()?),
-            4 => Payload::Literal(self.parse_literal()),
+            4 => Payload::Literal(self.parse_literal()?),
             5 => Payload::Gt(self.parse_packets()?),
             6 => Payload::Lt(self.parse_packets()?),
             7 => Payload::Eq(self.parse_packets()?),
@@ -148,4 +151,41 @@ fn main() {
     let packet = parse(bits).unwrap();
     println!("{}", version_sum(&packet));
     println!("{}", eval(&packet));
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_part1() {
+        for (result, input) in &[
+            (16, "8A004A801A8002F478"),
+            (12, "620080001611562C8802118E34"),
+            (23, "C0015000016115A2E0802F182340"),
+            (31, "A0016C880162017C3686B18A3D4780"),
+        ] {
+            let bits = input.parse().unwrap();
+            let packet = parse(bits).unwrap();
+            assert_eq!(*result, version_sum(&packet));
+        }
+    }
+
+    #[test]
+    fn test_part2() {
+        for (result, input) in &[
+            (3, "C200B40A82"),
+            (54, "04005AC33890"),
+            (7, "880086C3E88112"),
+            (9, "CE00C43D881120"),
+            (1, "D8005AC2A8F0"),
+            (0, "F600BC2D8F"),
+            (0, "9C005AC2F8F0"),
+            (1, "9C0141080250320F1802104A08"),
+        ] {
+            let bits = input.parse().unwrap();
+            let packet = parse(bits).unwrap();
+            assert_eq!(*result, eval(&packet));
+        }
+    }
 }
