@@ -1,29 +1,30 @@
-fn parse_bits(s: &str) -> Result<String, std::num::ParseIntError> {
-    let s = s.trim();
-    let v = (0..s.len())
-        .map(|i| u8::from_str_radix(&s[i..i + 1], 16))
-        .collect::<Result<Vec<u8>, _>>()?;
-    Ok(v.iter()
-        .flat_map(|x| [0b1000 & x, 0b0100 & x, 0b0010 & x, 0b0001 & x])
-        .map(|bit| if bit > 0 { "1" } else { "0" })
-        .collect())
-}
-
 struct BitStream {
     i: usize,
     bits: String,
 }
 
 impl BitStream {
-    fn new(bits: String) -> Self {
-        Self { bits, i: 0 }
-    }
-
-    fn read_num(&mut self, width: usize) -> u64 {
+    fn eat_num(&mut self, width: usize) -> u64 {
         assert!(self.i + width <= self.bits.len());
         let s = &self.bits[self.i..self.i + width];
         self.i += width;
         u64::from_str_radix(s, 2).unwrap()
+    }
+}
+
+impl std::str::FromStr for BitStream {
+    type Err = std::num::ParseIntError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.trim();
+        let v = (0..s.len())
+            .map(|i| u8::from_str_radix(&s[i..i + 1], 16))
+            .collect::<Result<Vec<u8>, _>>()?;
+        let bits = v
+            .iter()
+            .flat_map(|x| [0b1000 & x, 0b0100 & x, 0b0010 & x, 0b0001 & x])
+            .map(|bit| if bit > 0 { "1" } else { "0" })
+            .collect();
+        Ok(BitStream { bits, i: 0 })
     }
 }
 
@@ -60,19 +61,19 @@ impl PacketParser {
         let mut val = 0;
         let mut done = false;
         while !done {
-            done = self.bits.read_num(1) == 0;
-            val = (val << 4) | self.bits.read_num(4);
+            done = self.bits.eat_num(1) == 0;
+            val = (val << 4) | self.bits.eat_num(4);
         }
         val
     }
 
     fn parse_packets_by_count(&mut self) -> Result<Vec<Packet>, Error> {
-        let count = self.bits.read_num(11);
+        let count = self.bits.eat_num(11);
         (0..count).map(|_| self.parse_packet()).collect()
     }
 
     fn parse_packets_by_len(&mut self) -> Result<Vec<Packet>, Error> {
-        let len = self.bits.read_num(15) as usize;
+        let len = self.bits.eat_num(15) as usize;
         let start = self.bits.i;
         let mut packets = Vec::new();
         while self.bits.i < start + len {
@@ -82,7 +83,7 @@ impl PacketParser {
     }
 
     fn parse_packets(&mut self) -> Result<Vec<Packet>, Error> {
-        let length_type_id = self.bits.read_num(1);
+        let length_type_id = self.bits.eat_num(1);
         match length_type_id {
             0 => self.parse_packets_by_len(),
             1 => self.parse_packets_by_count(),
@@ -91,8 +92,8 @@ impl PacketParser {
     }
 
     fn parse_packet(&mut self) -> Result<Packet, Error> {
-        let version = self.bits.read_num(3);
-        let type_id = self.bits.read_num(3);
+        let version = self.bits.eat_num(3);
+        let type_id = self.bits.eat_num(3);
         let payload = match type_id {
             0 => Payload::Add(self.parse_packets()?),
             1 => Payload::Mul(self.parse_packets()?),
@@ -143,8 +144,8 @@ fn parse(bits: BitStream) -> Result<Packet, Error> {
 fn main() {
     let path = std::env::args().nth(1).expect("missing input path");
     let text = std::fs::read_to_string(&path).unwrap();
-    let bits = parse_bits(&text).unwrap();
-    let packet = parse(BitStream::new(bits)).unwrap();
+    let bits = text.parse().unwrap();
+    let packet = parse(bits).unwrap();
     println!("{}", version_sum(&packet));
     println!("{}", eval(&packet));
 }
