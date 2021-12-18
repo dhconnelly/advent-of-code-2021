@@ -35,10 +35,7 @@ fn add_to_rightmost(num: Num, value: u64) -> Num {
     }
 }
 
-fn explode(
-    mut num: Num,
-    level: usize,
-) -> (Num, Option<u64>, Option<u64>, bool) {
+fn explode(num: Num, level: usize) -> (Num, Option<u64>, Option<u64>, bool) {
     match (level, num) {
         (4, Num::Pair(lhs, rhs)) => match (lhs.as_ref(), rhs.as_ref()) {
             (Num::Regular(x), Num::Regular(y)) => {
@@ -146,20 +143,65 @@ fn explode(
     }
 }
 
+fn split(num: Num) -> (Num, bool) {
+    match num {
+        Num::Regular(value) => {
+            if value >= 10 {
+                let lhs = value / 2;
+                let rhs = value - lhs;
+                (
+                    Num::Pair(
+                        Box::new(Num::Regular(lhs)),
+                        Box::new(Num::Regular(rhs)),
+                    ),
+                    true,
+                )
+            } else {
+                (Num::Regular(value), false)
+            }
+        }
+        Num::Pair(lhs, rhs) => {
+            let (new_lhs, lhs_split) = split(*lhs);
+            if lhs_split {
+                return (Num::Pair(Box::new(new_lhs), rhs), true);
+            }
+            let (new_rhs, rhs_split) = split(*rhs);
+            (Num::Pair(Box::new(new_lhs), Box::new(new_rhs)), rhs_split)
+        }
+    }
+}
+
+fn reduce(mut num: Num) -> Num {
+    loop {
+        let (exploded_num, _, _, exploded) = explode(num, 0);
+        num = exploded_num;
+        if exploded {
+            continue;
+        }
+        let (split_num, was_split) = split(num);
+        num = split_num;
+        if was_split {
+            continue;
+        }
+        break;
+    }
+    num
+}
+
 fn add(lhs: Num, rhs: Num) -> Num {
     let sum = Num::Pair(Box::new(lhs), Box::new(rhs));
-    sum
+    reduce(sum)
 }
 
 fn sum(nums: &[Num]) -> Num {
-    nums.iter().for_each(|num| println!("{}", num));
-    let sum = nums.iter().skip(1).cloned().fold(nums[0].clone(), add);
-    println!("sum = {}", sum);
-    sum
+    nums.iter().skip(1).cloned().fold(nums[0].clone(), add)
 }
 
 fn magnitude(num: Num) -> u64 {
-    0
+    match num {
+        Num::Regular(value) => value,
+        Num::Pair(lhs, rhs) => 3 * magnitude(*lhs) + 2 * magnitude(*rhs),
+    }
 }
 
 fn parse(chars: &mut impl Iterator<Item = char>) -> Num {
