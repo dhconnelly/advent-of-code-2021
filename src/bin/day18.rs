@@ -35,138 +35,72 @@ fn add_to_rightmost(num: Num, value: u64) -> Num {
     }
 }
 
-fn explode(num: Num, level: usize) -> (Num, Option<u64>, Option<u64>, bool) {
-    match (level, num) {
-        (4, Num::Pair(lhs, rhs)) => match (lhs.as_ref(), rhs.as_ref()) {
+fn explode_pair(
+    lhs: Num,
+    rhs: Num,
+    level: usize,
+) -> (Num, Option<u64>, Option<u64>, bool) {
+    if level == 4 {
+        match (lhs, rhs) {
             (Num::Regular(x), Num::Regular(y)) => {
-                (Num::Regular(0), Some(*x), Some(*y), true)
+                return (Num::Regular(0), Some(x), Some(y), true);
             }
             _ => panic!("invalid exploding pair"),
-        },
-        (_, Num::Regular(num)) => (Num::Regular(num), None, None, false),
-        (_, Num::Pair(lhs, rhs)) => {
-            let (new_lhs, l, r, lhs_exploded) = explode(*lhs, level + 1);
-            match (l, r) {
-                (Some(l), Some(r)) => {
-                    return (
-                        Num::Pair(
-                            Box::new(new_lhs),
-                            Box::new(add_to_leftmost(*rhs, r)),
-                        ),
-                        Some(l),
-                        None,
-                        true,
-                    );
-                }
-                (None, Some(r)) => {
-                    return (
-                        Num::Pair(
-                            Box::new(new_lhs),
-                            Box::new(add_to_leftmost(*rhs, r)),
-                        ),
-                        None,
-                        None,
-                        true,
-                    );
-                }
-                (Some(l), None) => {
-                    return (
-                        Num::Pair(Box::new(new_lhs), rhs),
-                        Some(l),
-                        None,
-                        true,
-                    );
-                }
-                (None, None) => {
-                    if lhs_exploded {
-                        return (
-                            Num::Pair(Box::new(new_lhs), rhs),
-                            None,
-                            None,
-                            true,
-                        );
-                    }
-                }
-            }
-
-            let (new_rhs, l, r, rhs_exploded) = explode(*rhs, level + 1);
-            match (l, r) {
-                (Some(l), Some(r)) => {
-                    return (
-                        Num::Pair(
-                            Box::new(add_to_rightmost(new_lhs, l)),
-                            Box::new(new_rhs),
-                        ),
-                        None,
-                        Some(r),
-                        true,
-                    );
-                }
-                (Some(l), None) => {
-                    return (
-                        Num::Pair(
-                            Box::new(add_to_rightmost(new_lhs, l)),
-                            Box::new(new_rhs),
-                        ),
-                        None,
-                        None,
-                        true,
-                    );
-                }
-                (None, Some(r)) => {
-                    return (
-                        Num::Pair(Box::new(new_lhs), Box::new(new_rhs)),
-                        None,
-                        Some(r),
-                        true,
-                    );
-                }
-                (None, None) => {
-                    if rhs_exploded {
-                        return (
-                            Num::Pair(Box::new(new_lhs), Box::new(new_rhs)),
-                            None,
-                            None,
-                            true,
-                        );
-                    }
-                }
-            }
-
-            (
-                Num::Pair(Box::new(new_lhs), Box::new(new_rhs)),
-                None,
-                None,
-                false,
-            )
         }
+    }
+
+    let (new_lhs, l, r, lhs_exploded) = explode(lhs, level + 1);
+    if lhs_exploded {
+        let lhs = Box::new(new_lhs);
+        let rhs = if let Some(r) = r {
+            Box::new(add_to_leftmost(rhs, r))
+        } else {
+            Box::new(rhs)
+        };
+        return (Num::Pair(lhs, rhs), l, None, true);
+    }
+
+    let (new_rhs, l, r, rhs_exploded) = explode(rhs, level + 1);
+    if rhs_exploded {
+        let lhs = if let Some(l) = l {
+            Box::new(add_to_rightmost(new_lhs, l))
+        } else {
+            Box::new(new_lhs)
+        };
+        let rhs = Box::new(new_rhs);
+        return (Num::Pair(lhs, rhs), None, r, true);
+    }
+
+    let lhs = Box::new(new_lhs);
+    let rhs = Box::new(new_rhs);
+    (Num::Pair(lhs, rhs), None, None, false)
+}
+
+fn explode(num: Num, level: usize) -> (Num, Option<u64>, Option<u64>, bool) {
+    match num {
+        Num::Regular(num) => (Num::Regular(num), None, None, false),
+        Num::Pair(lhs, rhs) => explode_pair(*lhs, *rhs, level),
     }
 }
 
 fn split(num: Num) -> (Num, bool) {
     match num {
-        Num::Regular(value) => {
-            if value >= 10 {
-                let lhs = value / 2;
-                let rhs = value - lhs;
-                (
-                    Num::Pair(
-                        Box::new(Num::Regular(lhs)),
-                        Box::new(Num::Regular(rhs)),
-                    ),
-                    true,
-                )
-            } else {
-                (Num::Regular(value), false)
-            }
-        }
+        Num::Regular(value) if value >= 10 => (
+            Num::Pair(
+                Box::new(Num::Regular(value / 2)),
+                Box::new(Num::Regular(value - (value / 2))),
+            ),
+            true,
+        ),
+        Num::Regular(value) => (Num::Regular(value), false),
         Num::Pair(lhs, rhs) => {
             let (new_lhs, lhs_split) = split(*lhs);
             if lhs_split {
                 return (Num::Pair(Box::new(new_lhs), rhs), true);
+            } else {
+                let (new_rhs, rhs_split) = split(*rhs);
+                (Num::Pair(Box::new(new_lhs), Box::new(new_rhs)), rhs_split)
             }
-            let (new_rhs, rhs_split) = split(*rhs);
-            (Num::Pair(Box::new(new_lhs), Box::new(new_rhs)), rhs_split)
         }
     }
 }
