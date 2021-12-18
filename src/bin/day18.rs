@@ -226,11 +226,27 @@ fn parse_nums(s: &str) -> Vec<Num> {
     s.lines().map(str::trim).map(parse_num).collect()
 }
 
+fn part2(nums: &[Num]) -> u64 {
+    let mut max = std::u64::MIN;
+    for i in 0..nums.len() {
+        for j in 0..nums.len() {
+            if i != j {
+                let m = magnitude(add(nums[i].clone(), nums[j].clone()));
+                if m > max {
+                    max = m;
+                }
+            }
+        }
+    }
+    max
+}
+
 fn main() {
     let path = std::env::args().nth(1).expect("missing input path");
     let text = std::fs::read_to_string(&path).unwrap();
     let nums = parse_nums(&text);
     println!("{}", magnitude(sum(&nums)));
+    println!("{}", part2(&nums));
 }
 
 #[cfg(test)]
