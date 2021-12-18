@@ -4,7 +4,6 @@ use std::str;
 #[derive(Debug, Clone)]
 enum Num {
     Regular(u64),
-    Nested(Box<Num>),
     Pair(Box<Num>, Box<Num>),
 }
 
@@ -12,15 +11,50 @@ impl fmt::Display for Num {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Num::Regular(num) => write!(f, "{}", num)?,
-            Num::Nested(num) => write!(f, "{}", num)?,
             Num::Pair(lhs, rhs) => write!(f, "[{}, {}]", lhs, rhs)?,
         }
         Ok(())
     }
 }
 
+fn add_to_leftmost(num: Num, value: u64) -> Num {
+    num
+}
+
+fn add_to_rightmost(num: Num, value: u64) -> Num {
+    num
+}
+
+fn explode(mut num: Num, level: usize) -> (Num, Option<(u64, u64)>) {
+    match (level, num) {
+        (4, Num::Pair(lhs, rhs)) => match (lhs.as_ref(), rhs.as_ref()) {
+            (Num::Regular(x), Num::Regular(y)) => {
+                (Num::Regular(0), Some((*x, *y)))
+            }
+            _ => panic!("invalid exploding pair"),
+        },
+        (_, Num::Regular(num)) => (Num::Regular(num), None),
+        (_, Num::Pair(lhs, rhs)) => {
+            let (new_lhs, exploded_pair) = explode(*lhs, level + 1);
+            if exploded_pair.is_some() {
+                println!("exploded_pair: {:?}", exploded_pair);
+                // TODO
+                return (Num::Pair(Box::new(new_lhs), rhs), exploded_pair);
+            }
+            let (new_rhs, exploded_pair) = explode(*rhs, level + 1);
+            if exploded_pair.is_some() {}
+            println!("exploded_pair: {:?}", exploded_pair);
+            (
+                Num::Pair(Box::new(new_lhs), Box::new(new_rhs)),
+                exploded_pair,
+            )
+        }
+    }
+}
+
 fn add(lhs: Num, rhs: Num) -> Num {
-    Num::Pair(Box::new(lhs), Box::new(rhs))
+    let sum = Num::Pair(Box::new(lhs), Box::new(rhs));
+    sum
 }
 
 fn sum(nums: &[Num]) -> Num {
@@ -39,15 +73,10 @@ fn parse(chars: &mut impl Iterator<Item = char>) -> Num {
         None => panic!("unexpected eof"),
         Some('[') => {
             let lhs = parse(chars);
-            let pair = if let Some(',') = chars.next() {
-                let rhs = parse(chars);
-                assert_eq!(Some(']'), chars.next());
-                Num::Pair(Box::new(lhs), Box::new(rhs))
-            } else {
-                assert_eq!(Some(']'), chars.next());
-                Num::Nested(Box::new(lhs))
-            };
-            pair
+            assert_eq!(Some(','), chars.next());
+            let rhs = parse(chars);
+            assert_eq!(Some(']'), chars.next());
+            Num::Pair(Box::new(lhs), Box::new(rhs))
         }
         Some(ch) => Num::Regular(ch.to_digit(10).unwrap() as u64),
     }
@@ -98,11 +127,33 @@ mod test {
              [[[5,[7,4]],7],1]
              [[[[4,2],2],6],[8,7]]",
         );
-        let expected: Num = parse(
-            &mut "[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]"
-                .chars(),
-        );
+        let expected =
+            parse_num("[[[[8,7],[7,7]],[[8,6],[7,7]]],[[[0,7],[6,6]],[8,7]]]");
         assert_eq!(expected.to_string(), sum(&nums).to_string());
+    }
+
+    #[test]
+    fn test_explode() {
+        for (before, after, pair) in &[
+            ("[[[[[9,8],1],2],3],4]", "[[[[0,9],2],3],4]", (9, 8)),
+            ("[7,[6,[5,[4,[3,2]]]]]", "[7,[6,[5,[7,0]]]]", (3, 2)),
+            ("[[6,[5,[4,[3,2]]]],1]", "[[6,[5,[7,0]]],3]", (3, 2)),
+            (
+                "[[3,[2,[1,[7,3]]]],[6,[5,[4,[3,2]]]]]",
+                "[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]",
+                (7, 3),
+            ),
+            (
+                "[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]",
+                "[[3,[2,[8,0]]],[9,[5,[7,0]]]]",
+                (3, 2),
+            ),
+        ] {
+            let (result, exploded_pair) = explode(parse_num(before), 0);
+            assert!(exploded_pair.is_some());
+            assert_eq!(exploded_pair.unwrap(), *pair);
+            //assert_eq!(after.to_string(), result.to_string());
+        }
     }
 
     #[test]
