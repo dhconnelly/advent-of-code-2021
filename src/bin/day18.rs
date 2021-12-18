@@ -18,35 +18,129 @@ impl fmt::Display for Num {
 }
 
 fn add_to_leftmost(num: Num, value: u64) -> Num {
-    num
+    match num {
+        Num::Regular(num) => Num::Regular(num + value),
+        Num::Pair(lhs, rhs) => {
+            Num::Pair(Box::new(add_to_leftmost(*lhs, value)), rhs)
+        }
+    }
 }
 
 fn add_to_rightmost(num: Num, value: u64) -> Num {
-    num
+    match num {
+        Num::Regular(num) => Num::Regular(num + value),
+        Num::Pair(lhs, rhs) => {
+            Num::Pair(lhs, Box::new(add_to_rightmost(*rhs, value)))
+        }
+    }
 }
 
-fn explode(mut num: Num, level: usize) -> (Num, Option<(u64, u64)>) {
+fn explode(
+    mut num: Num,
+    level: usize,
+) -> (Num, Option<u64>, Option<u64>, bool) {
     match (level, num) {
         (4, Num::Pair(lhs, rhs)) => match (lhs.as_ref(), rhs.as_ref()) {
             (Num::Regular(x), Num::Regular(y)) => {
-                (Num::Regular(0), Some((*x, *y)))
+                (Num::Regular(0), Some(*x), Some(*y), true)
             }
             _ => panic!("invalid exploding pair"),
         },
-        (_, Num::Regular(num)) => (Num::Regular(num), None),
+        (_, Num::Regular(num)) => (Num::Regular(num), None, None, false),
         (_, Num::Pair(lhs, rhs)) => {
-            let (new_lhs, exploded_pair) = explode(*lhs, level + 1);
-            if exploded_pair.is_some() {
-                println!("exploded_pair: {:?}", exploded_pair);
-                // TODO
-                return (Num::Pair(Box::new(new_lhs), rhs), exploded_pair);
+            let (new_lhs, l, r, lhs_exploded) = explode(*lhs, level + 1);
+            match (l, r) {
+                (Some(l), Some(r)) => {
+                    return (
+                        Num::Pair(
+                            Box::new(new_lhs),
+                            Box::new(add_to_leftmost(*rhs, r)),
+                        ),
+                        Some(l),
+                        None,
+                        true,
+                    );
+                }
+                (None, Some(r)) => {
+                    return (
+                        Num::Pair(
+                            Box::new(new_lhs),
+                            Box::new(add_to_leftmost(*rhs, r)),
+                        ),
+                        None,
+                        None,
+                        true,
+                    );
+                }
+                (Some(l), None) => {
+                    return (
+                        Num::Pair(Box::new(new_lhs), rhs),
+                        Some(l),
+                        None,
+                        true,
+                    );
+                }
+                (None, None) => {
+                    if lhs_exploded {
+                        return (
+                            Num::Pair(Box::new(new_lhs), rhs),
+                            None,
+                            None,
+                            true,
+                        );
+                    }
+                }
             }
-            let (new_rhs, exploded_pair) = explode(*rhs, level + 1);
-            if exploded_pair.is_some() {}
-            println!("exploded_pair: {:?}", exploded_pair);
+
+            let (new_rhs, l, r, rhs_exploded) = explode(*rhs, level + 1);
+            match (l, r) {
+                (Some(l), Some(r)) => {
+                    return (
+                        Num::Pair(
+                            Box::new(add_to_rightmost(new_lhs, l)),
+                            Box::new(new_rhs),
+                        ),
+                        None,
+                        Some(r),
+                        true,
+                    );
+                }
+                (Some(l), None) => {
+                    return (
+                        Num::Pair(
+                            Box::new(add_to_rightmost(new_lhs, l)),
+                            Box::new(new_rhs),
+                        ),
+                        None,
+                        None,
+                        true,
+                    );
+                }
+                (None, Some(r)) => {
+                    return (
+                        Num::Pair(Box::new(new_lhs), Box::new(new_rhs)),
+                        None,
+                        Some(r),
+                        true,
+                    );
+                }
+                (None, None) => {
+                    if rhs_exploded {
+                        return (
+                            Num::Pair(Box::new(new_lhs), Box::new(new_rhs)),
+                            None,
+                            None,
+                            true,
+                        );
+                    }
+                }
+            }
+
             (
                 Num::Pair(Box::new(new_lhs), Box::new(new_rhs)),
-                exploded_pair,
+                None,
+                None,
+                false,
             )
         }
     }
@@ -135,24 +229,32 @@ mod test {
     #[test]
     fn test_explode() {
         for (before, after, pair) in &[
-            ("[[[[[9,8],1],2],3],4]", "[[[[0,9],2],3],4]", (9, 8)),
-            ("[7,[6,[5,[4,[3,2]]]]]", "[7,[6,[5,[7,0]]]]", (3, 2)),
-            ("[[6,[5,[4,[3,2]]]],1]", "[[6,[5,[7,0]]],3]", (3, 2)),
+            (
+                "[[[[[9,8],1],2],3],4]",
+                "[[[[0,9],2],3],4]",
+                (Some(9), None),
+            ),
+            (
+                "[7,[6,[5,[4,[3,2]]]]]",
+                "[7,[6,[5,[7,0]]]]",
+                (None, Some(2)),
+            ),
+            ("[[6,[5,[4,[3,2]]]],1]", "[[6,[5,[7,0]]],3]", (None, None)),
             (
                 "[[3,[2,[1,[7,3]]]],[6,[5,[4,[3,2]]]]]",
                 "[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]",
-                (7, 3),
+                (None, None),
             ),
             (
                 "[[3,[2,[8,0]]],[9,[5,[4,[3,2]]]]]",
                 "[[3,[2,[8,0]]],[9,[5,[7,0]]]]",
-                (3, 2),
+                (None, Some(2)),
             ),
         ] {
-            let (result, exploded_pair) = explode(parse_num(before), 0);
-            assert!(exploded_pair.is_some());
-            assert_eq!(exploded_pair.unwrap(), *pair);
-            //assert_eq!(after.to_string(), result.to_string());
+            let (result, l, r, exploded) = explode(parse_num(before), 0);
+            assert!(exploded);
+            assert_eq!(pair, &(l, r));
+            assert_eq!(parse_num(after).to_string(), result.to_string());
         }
     }
 
