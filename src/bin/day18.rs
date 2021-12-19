@@ -17,114 +17,76 @@ impl fmt::Display for Num {
     }
 }
 
-fn add_to_leftmost(num: Num, value: u64) -> Num {
+fn add_to_leftmost(num: &mut Num, value: u64) {
     match num {
-        Num::Regular(num) => Num::Regular(num + value),
-        Num::Pair(lhs, rhs) => {
-            Num::Pair(Box::new(add_to_leftmost(*lhs, value)), rhs)
-        }
+        Num::Regular(num) => *num += value,
+        Num::Pair(lhs, _) => add_to_leftmost(lhs.as_mut(), value),
     }
 }
 
-fn add_to_rightmost(num: Num, value: u64) -> Num {
+fn add_to_rightmost(num: &mut Num, value: u64) {
     match num {
-        Num::Regular(num) => Num::Regular(num + value),
-        Num::Pair(lhs, rhs) => {
-            Num::Pair(lhs, Box::new(add_to_rightmost(*rhs, value)))
-        }
+        Num::Regular(num) => *num += value,
+        Num::Pair(_, rhs) => add_to_rightmost(rhs.as_mut(), value),
     }
 }
 
-fn explode_pair(
-    lhs: Num,
-    rhs: Num,
-    level: usize,
-) -> (Num, Option<u64>, Option<u64>, bool) {
-    if level == 4 {
-        match (lhs, rhs) {
-            (Num::Regular(x), Num::Regular(y)) => {
-                return (Num::Regular(0), Some(x), Some(y), true);
+fn explode(num: &mut Num, level: usize) -> (Option<u64>, Option<u64>, bool) {
+    match num {
+        Num::Regular(_) => (None, None, false),
+
+        Num::Pair(lhs, rhs) if level == 4 => {
+            let (lhs, rhs) = (lhs.as_ref(), rhs.as_ref());
+            if let (Num::Regular(x), Num::Regular(y)) = (lhs, rhs) {
+                let (l, r) = (Some(*x), Some(*y));
+                *num = Num::Regular(0);
+                return (l, r, true);
             }
-            _ => panic!("invalid exploding pair"),
+            panic!("invalid exploding pair");
         }
-    }
 
-    let (new_lhs, l, r, lhs_exploded) = explode(lhs, level + 1);
-    if lhs_exploded {
-        let lhs = Box::new(new_lhs);
-        let rhs = if let Some(r) = r {
-            Box::new(add_to_leftmost(rhs, r))
-        } else {
-            Box::new(rhs)
-        };
-        return (Num::Pair(lhs, rhs), l, None, true);
-    }
-
-    let (new_rhs, l, r, rhs_exploded) = explode(rhs, level + 1);
-    if rhs_exploded {
-        let lhs = if let Some(l) = l {
-            Box::new(add_to_rightmost(new_lhs, l))
-        } else {
-            Box::new(new_lhs)
-        };
-        let rhs = Box::new(new_rhs);
-        return (Num::Pair(lhs, rhs), None, r, true);
-    }
-
-    let lhs = Box::new(new_lhs);
-    let rhs = Box::new(new_rhs);
-    (Num::Pair(lhs, rhs), None, None, false)
-}
-
-fn explode(num: Num, level: usize) -> (Num, Option<u64>, Option<u64>, bool) {
-    match num {
-        Num::Regular(num) => (Num::Regular(num), None, None, false),
-        Num::Pair(lhs, rhs) => explode_pair(*lhs, *rhs, level),
-    }
-}
-
-fn split(num: Num) -> (Num, bool) {
-    match num {
-        Num::Regular(value) if value >= 10 => (
-            Num::Pair(
-                Box::new(Num::Regular(value / 2)),
-                Box::new(Num::Regular(value - (value / 2))),
-            ),
-            true,
-        ),
-        Num::Regular(value) => (Num::Regular(value), false),
-        Num::Pair(lhs, rhs) => {
-            let (new_lhs, lhs_split) = split(*lhs);
-            if lhs_split {
-                return (Num::Pair(Box::new(new_lhs), rhs), true);
-            } else {
-                let (new_rhs, rhs_split) = split(*rhs);
-                (Num::Pair(Box::new(new_lhs), Box::new(new_rhs)), rhs_split)
+        Num::Pair(ref mut lhs, ref mut rhs) => {
+            let (l, r, lhs_exploded) = explode(lhs, level + 1);
+            if let Some(r) = r {
+                add_to_leftmost(rhs, r);
             }
+            if lhs_exploded {
+                return (l, None, true);
+            }
+            let (l, r, rhs_exploded) = explode(rhs, level + 1);
+            if let Some(l) = l {
+                add_to_rightmost(lhs, l);
+            }
+            (None, r, rhs_exploded)
         }
     }
 }
 
-fn reduce(mut num: Num) -> Num {
-    loop {
-        let (exploded_num, _, _, exploded) = explode(num, 0);
-        num = exploded_num;
-        if exploded {
-            continue;
+fn split(num: &mut Num) -> bool {
+    match num {
+        Num::Regular(value) if *value >= 10 => {
+            *num = Num::Pair(
+                Box::new(Num::Regular(*value / 2)),
+                Box::new(Num::Regular(*value - (*value / 2))),
+            );
+            true
         }
-        let (split_num, was_split) = split(num);
-        num = split_num;
-        if was_split {
-            continue;
-        }
-        break;
+        Num::Regular(_) => false,
+        Num::Pair(lhs, rhs) => split(lhs.as_mut()) || split(rhs.as_mut()),
     }
-    num
+}
+
+fn reduce(num: &mut Num) {
+    let mut reducing = true;
+    while reducing {
+        reducing = explode(num, 0).2 || split(num);
+    }
 }
 
 fn add(lhs: Num, rhs: Num) -> Num {
-    let sum = Num::Pair(Box::new(lhs), Box::new(rhs));
-    reduce(sum)
+    let mut sum = Num::Pair(Box::new(lhs), Box::new(rhs));
+    reduce(&mut sum);
+    sum
 }
 
 fn sum(nums: &[Num]) -> Num {
@@ -243,7 +205,8 @@ mod test {
                 (None, Some(2)),
             ),
         ] {
-            let (result, l, r, exploded) = explode(parse_num(before), 0);
+            let mut result = parse_num(before);
+            let (l, r, exploded) = explode(&mut result, 0);
             assert!(exploded);
             assert_eq!(pair, &(l, r));
             assert_eq!(parse_num(after).to_string(), result.to_string());
