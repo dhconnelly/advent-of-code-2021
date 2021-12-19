@@ -77,10 +77,7 @@ fn split(num: &mut Num) -> bool {
 }
 
 fn reduce(num: &mut Num) {
-    let mut reducing = true;
-    while reducing {
-        reducing = explode(num, 0).2 || split(num);
-    }
+    while explode(num, 0).2 || split(num) {}
 }
 
 fn add(lhs: Num, rhs: Num) -> Num {
