@@ -13,8 +13,20 @@ fn parse(s: &str) -> Vec<Scan> {
 }
 
 fn find(scan1: &Scan, scan2: &Scan) -> Option<Vec<Pt3>> {
-    println!("{:?}", scan1);
-    println!("{:?}", scan2);
+    for (x1, y1, z1) in scan1 {
+        for (x2, y2, z2) in scan2 {
+            let (dx, dy, dz) = (x1 - x2, y1 - y2, z1 - z2);
+            let scan2_shifted = scan2
+                .iter()
+                .map(|&(x, y, z)| (x + dx, y + dy, z + dz))
+                .collect();
+            let common: Vec<_> =
+                scan1.intersection(&scan2_shifted).copied().collect();
+            if common.len() >= 12 {
+                return Some(common);
+            }
+        }
+    }
     None
 }
 
@@ -48,7 +60,7 @@ fn rotations(scan: &Scan) -> Vec<Scan> {
     rotations
 }
 
-fn find_common_beacons(scan1: &Scan, scan2: &Scan) -> Option<Vec<Pt3>> {
+fn find_with_rotations(scan1: &Scan, scan2: &Scan) -> Option<Vec<Pt3>> {
     for scan2 in rotations(scan2) {
         if let Some(beacons) = find(&scan1, &scan2) {
             return Some(beacons);
@@ -61,9 +73,8 @@ fn main() {
     let path = std::env::args().nth(1).expect("missing input path");
     let text = std::fs::read_to_string(&path).unwrap();
     let scans = parse(&text);
-    println!("{:?}", scans);
-    for scan in rotations(&scans[0]) {
-        println!("{:?}", scan);
+    for pt in find_with_rotations(&scans[0], &scans[1]).unwrap() {
+        println!("{:?}", pt);
     }
 }
 
