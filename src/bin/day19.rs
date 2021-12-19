@@ -22,24 +22,9 @@ fn maybe_align(scan1: &Scan, scan2: &Scan) -> Option<Scan> {
                 .collect();
             let common: Vec<_> =
                 scan1.intersection(&scan2_shifted).copied().collect();
-            if common.len() < 12 {
-                continue;
+            if common.len() >= 12 {
+                return Some(scan2_shifted.union(scan1).copied().collect());
             }
-            for pt @ &(x, y, z) in &scan2_shifted {
-                if !scan1.contains(&pt) && x <= 1000 && y <= 1000 && z <= 1000 {
-                    continue;
-                }
-            }
-            for pt @ &(x, y, z) in scan1 {
-                if !scan2_shifted.contains(&pt)
-                    && x <= 1000
-                    && y <= 1000
-                    && z <= 1000
-                {
-                    continue;
-                }
-            }
-            return Some(scan2_shifted.iter().copied().collect());
         }
     }
     None
@@ -76,17 +61,15 @@ fn rotations(scan: &Scan) -> Vec<Scan> {
 }
 
 fn align(scans: &mut [Scan]) {
-    let mut aligned = vec![false; scans.len()];
-    aligned[0] = true;
     for i in 0..scans.len() {
         for j in 0..scans.len() {
-            if i == j || aligned[j] {
+            if i == j || scans[i].is_empty() || scans[j].is_empty() {
                 continue;
             }
             for scan2 in rotations(&scans[j]) {
-                if let Some(scan2) = maybe_align(&scans[i], &scan2) {
-                    scans[j] = scan2;
-                    aligned[j] = true;
+                if let Some(aligned) = maybe_align(&scans[i], &scan2) {
+                    scans[i] = aligned;
+                    scans[j] = Scan::new();
                     break;
                 }
             }
