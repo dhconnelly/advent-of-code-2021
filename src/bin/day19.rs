@@ -56,40 +56,21 @@ fn maybe_align(scan1: &Scan, scan2: &Scan) -> Option<Scan> {
     None
 }
 
-fn rotate(scan: &Scan, rot: impl Fn(&Pt3) -> Pt3 + Copy) -> Scan {
-    let beacons = scan.beacons.iter().map(rot).collect();
-    let scanners = scan.scanners.iter().map(rot).collect();
-    Scan { beacons, scanners }
+fn rotate(scan: &mut Scan, rot: impl Fn(&Pt3) -> Pt3 + Copy) {
+    scan.beacons = scan.beacons.iter().map(rot).collect();
+    scan.scanners = scan.scanners.iter().map(rot).collect();
 }
 
-fn rotate_z(scan: &Scan) -> Scan {
+fn rotate_z(scan: &mut Scan) {
     rotate(scan, |&(x, y, z)| (-y, x, z))
 }
 
-fn rotate_x(scan: &Scan) -> Scan {
+fn rotate_x(scan: &mut Scan) {
     rotate(scan, |&(x, y, z)| (x, -z, y))
 }
 
-fn rotate_y(scan: &Scan) -> Scan {
+fn rotate_y(scan: &mut Scan) {
     rotate(scan, |&(x, y, z)| (-z, y, x))
-}
-
-fn rotations(scan: &Scan) -> Vec<Scan> {
-    let mut scan = scan.clone();
-    let mut rotations = Vec::new();
-    for _ in 0..4 {
-        for _ in 0..4 {
-            scan = rotate_z(&scan);
-            rotations.push(scan.clone());
-        }
-        for _ in 0..2 {
-            scan = rotate_x(&scan);
-            rotations.push(scan.clone());
-            scan = rotate_x(&scan);
-        }
-        scan = rotate_y(&scan);
-    }
-    rotations
 }
 
 fn align(mut scans: Vec<Scan>) -> Scan {
@@ -99,12 +80,31 @@ fn align(mut scans: Vec<Scan>) -> Scan {
             if i == j || done[i] || done[j] {
                 continue;
             }
-            for scan2 in rotations(&scans[j]) {
-                if let Some(aligned) = maybe_align(&scans[i], &scan2) {
-                    scans[i] = aligned;
-                    done[j] = true;
+            for _ in 0..4 {
+                for _ in 0..4 {
+                    rotate_z(&mut scans[j]);
+                    if let Some(aligned) = maybe_align(&scans[i], &scans[j]) {
+                        scans[i] = aligned;
+                        done[j] = true;
+                        break;
+                    }
+                }
+                if done[j] {
                     break;
                 }
+                for _ in 0..2 {
+                    rotate_x(&mut scans[j]);
+                    if let Some(aligned) = maybe_align(&scans[i], &scans[j]) {
+                        scans[i] = aligned;
+                        done[j] = true;
+                        break;
+                    }
+                    rotate_x(&mut scans[j]);
+                }
+                if done[j] {
+                    break;
+                }
+                rotate_y(&mut scans[j]);
             }
         }
     }
