@@ -56,22 +56,22 @@ fn maybe_align(scan1: &Scan, scan2: &Scan) -> Option<Scan> {
     None
 }
 
-fn rotate_z(scan: &Scan) -> Scan {
-    let beacons = scan.beacons.iter().map(|&(x, y, z)| (-y, x, z)).collect();
-    let scanners = scan.scanners.iter().map(|&(x, y, z)| (-y, x, z)).collect();
+fn rotate(scan: &Scan, rot: impl Fn(&Pt3) -> Pt3 + Copy) -> Scan {
+    let beacons = scan.beacons.iter().map(rot).collect();
+    let scanners = scan.scanners.iter().map(rot).collect();
     Scan { beacons, scanners }
+}
+
+fn rotate_z(scan: &Scan) -> Scan {
+    rotate(scan, |&(x, y, z)| (-y, x, z))
 }
 
 fn rotate_x(scan: &Scan) -> Scan {
-    let beacons = scan.beacons.iter().map(|&(x, y, z)| (x, -z, y)).collect();
-    let scanners = scan.scanners.iter().map(|&(x, y, z)| (x, -z, y)).collect();
-    Scan { beacons, scanners }
+    rotate(scan, |&(x, y, z)| (x, -z, y))
 }
 
 fn rotate_y(scan: &Scan) -> Scan {
-    let beacons = scan.beacons.iter().map(|&(x, y, z)| (-z, y, x)).collect();
-    let scanners = scan.scanners.iter().map(|&(x, y, z)| (-z, y, x)).collect();
-    Scan { beacons, scanners }
+    rotate(scan, |&(x, y, z)| (-z, y, x))
 }
 
 fn rotations(scan: &Scan) -> Vec<Scan> {
