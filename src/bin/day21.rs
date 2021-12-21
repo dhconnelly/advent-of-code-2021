@@ -31,7 +31,7 @@ fn part1(mut pos1: i64, mut pos2: i64) -> i64 {
     }
 }
 
-fn play(
+fn play_quantum(
     pos1: i64,
     score1: i64,
     pos2: i64,
