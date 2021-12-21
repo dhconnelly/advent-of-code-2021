@@ -51,7 +51,7 @@ fn play_quantum(
                 for roll3 in 1..=3 {
                     let npos1 = ((pos1 - 1) + roll1 + roll2 + roll3) % 10 + 1;
                     let nscore1 = score1 + npos1;
-                    let wins = play(pos2, score2, npos1, nscore1, mem);
+                    let wins = play_quantum(pos2, score2, npos1, nscore1, mem);
                     wins1 += wins.1;
                     wins2 += wins.0;
                 }
@@ -63,7 +63,7 @@ fn play_quantum(
 }
 
 fn part2(pos1: i64, pos2: i64) -> i64 {
-    let (wins1, wins2) = play(pos1, 0, pos2, 0, &mut HashMap::new());
+    let (wins1, wins2) = play_quantum(pos1, 0, pos2, 0, &mut HashMap::new());
     wins1.max(wins2)
 }
 
@@ -91,17 +91,17 @@ Player 2 starting position: 8";
 
     #[test]
     fn test_part2() {
-        assert_eq!((1, 0), play(1, 26, 1, 0, &mut HashMap::new()));
-        assert_eq!((0, 1), play(1, 0, 1, 26, &mut HashMap::new()));
-        assert_eq!((1, 0), play(1, 26, 1, 0, &mut HashMap::new()));
-        assert_eq!((0, 1), play(1, 0, 1, 26, &mut HashMap::new()));
+        assert_eq!((1, 0), play_quantum(1, 26, 1, 0, &mut HashMap::new()));
+        assert_eq!((0, 1), play_quantum(1, 0, 1, 26, &mut HashMap::new()));
+        assert_eq!((1, 0), play_quantum(1, 26, 1, 0, &mut HashMap::new()));
+        assert_eq!((0, 1), play_quantum(1, 0, 1, 26, &mut HashMap::new()));
 
         let mut mem = HashMap::new();
-        assert_eq!((27, 0), play(7, 20, 1, 0, &mut mem));
+        assert_eq!((27, 0), play_quantum(7, 20, 1, 0, &mut mem));
         assert_eq!(&(27, 0), mem.get(&(7, 20, 1, 0)).unwrap());
 
         let mut mem = HashMap::from([((1, 2, 3, 4), (7, 14))]);
-        assert_eq!((7, 14), play(1, 2, 3, 4, &mut mem));
+        assert_eq!((7, 14), play_quantum(1, 2, 3, 4, &mut mem));
 
         let (pos1, pos2) = parse(INPUT);
         assert_eq!(444356092776315, part2(pos1, pos2));
