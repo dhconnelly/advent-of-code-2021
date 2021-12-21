@@ -92,32 +92,31 @@ fn rotations(scan: &Scan) -> Vec<Scan> {
     rotations
 }
 
-fn align(scans: &mut [Scan]) {
+fn align(mut scans: Vec<Scan>) -> Scan {
+    let mut done = vec![false; scans.len()];
     for i in 0..scans.len() {
         for j in 0..scans.len() {
-            if i == j
-                || scans[i].beacons.is_empty()
-                || scans[j].beacons.is_empty()
-            {
+            if i == j || done[i] || done[j] {
                 continue;
             }
             for scan2 in rotations(&scans[j]) {
                 if let Some(aligned) = maybe_align(&scans[i], &scan2) {
                     scans[i] = aligned;
-                    scans[j].beacons = HashSet::new();
-                    scans[j].scanners = HashSet::new();
+                    done[j] = true;
                     break;
                 }
             }
         }
     }
+    let idx = done.iter().position(|&done| !done).unwrap();
+    scans.remove(idx)
 }
 
 fn manhattan(&(x1, y1, z1): &Pt3, &(x2, y2, z2): &Pt3) -> i64 {
     (x1 - x2).abs() + (y1 - y2).abs() + (z1 - z2).abs()
 }
 
-fn max_dist(pts: &[Pt3]) -> i64 {
+fn max_dist(pts: &Vec<Pt3>) -> i64 {
     let mut max = std::i64::MIN;
     for pt1 in pts {
         for pt2 in pts {
@@ -132,12 +131,8 @@ fn max_dist(pts: &[Pt3]) -> i64 {
 fn main() {
     let path = std::env::args().nth(1).expect("missing input path");
     let text = std::fs::read_to_string(&path).unwrap();
-    let mut scans = parse(&text);
-    align(&mut scans);
-    let beacons: HashSet<Pt3> =
-        scans.iter().flat_map(|scan| scan.beacons.iter().copied()).collect();
-    println!("{}", beacons.len());
-    let scanners: Vec<Pt3> =
-        scans.iter().flat_map(|scan| scan.scanners.iter().copied()).collect();
-    println!("{}", max_dist(&scanners));
+    let scans = parse(&text);
+    let scan = align(scans);
+    println!("{}", scan.beacons.len());
+    println!("{}", max_dist(&scan.scanners.iter().cloned().collect()));
 }
