@@ -173,6 +173,11 @@ fn part2(steps: &[Step]) -> i64 {
             if cube.exclusive(prev) {
                 continue;
             } else if prev.contains(&cube) {
+                if step.cmd == Command::Off {
+                    remove.insert(prev.clone());
+                    let exterior = prev.remove_interior(&cube);
+                    add.extend(exterior.into_iter());
+                }
                 continue 'outer;
             } else if cube.contains(prev) {
                 let exterior = cube.remove_interior(prev);
