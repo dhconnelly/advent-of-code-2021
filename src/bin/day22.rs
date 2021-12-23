@@ -1,17 +1,25 @@
-type Pt3 = (i64, i64, i64);
-type Grid = std::collections::HashSet<Pt3>;
+use std::collections::HashSet;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+type Pt3 = (i64, i64, i64);
+type Grid = HashSet<Pt3>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum Command {
     On,
     Off,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Step {
     cmd: Command,
     lo: Pt3,
     hi: Pt3,
+}
+
+impl Step {
+    fn cube(&self) -> Cube {
+        Cube { lo: self.lo, hi: self.hi }
+    }
 }
 
 fn apply(
@@ -69,10 +77,132 @@ fn part1(steps: &[Step]) -> i64 {
     grid.len() as i64
 }
 
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+struct Cube {
+    lo: Pt3,
+    hi: Pt3,
+}
+
+impl Cube {
+    fn volume(&self) -> i64 {
+        (self.hi.0 - self.lo.0 + 1)
+            * (self.hi.1 - self.lo.1 + 1)
+            * (self.hi.2 - self.lo.2 + 1)
+    }
+
+    fn contains(&self, other: &Cube) -> bool {
+        self.lo.0 <= other.lo.0
+            && other.hi.0 <= self.hi.0
+            && self.lo.1 <= other.lo.1
+            && other.hi.1 <= self.hi.1
+            && self.lo.2 <= other.lo.2
+            && other.hi.2 <= self.hi.2
+    }
+
+    fn exclusive(&self, other: &Cube) -> bool {
+        let (lo1, hi1) = (self.lo, self.hi);
+        let (lo2, hi2) = (other.lo, other.hi);
+        hi1.0 < lo2.0
+            || lo1.0 > hi2.0
+            || hi1.1 < lo2.1
+            || lo1.1 > hi2.1
+            || hi2.2 < lo2.2
+            || lo1.2 > hi2.2
+    }
+
+    fn remove_interior(&self, interior: &Cube) -> Vec<Cube> {
+        vec![
+            Cube {
+                lo: (self.lo.0, self.lo.1, self.lo.2),
+                hi: (self.hi.0, self.hi.1, interior.lo.2),
+            }, // bottom
+            Cube {
+                lo: (self.lo.0, self.lo.1, interior.hi.2),
+                hi: (self.hi.0, self.hi.1, self.hi.2),
+            }, // top
+            // on level of interior (E):
+            // aaaaa
+            // b E c
+            // ddddd
+            Cube {
+                lo: (self.lo.0, interior.hi.1, interior.lo.2),
+                hi: (self.hi.0, self.hi.1, interior.hi.2),
+            }, // a
+            Cube {
+                lo: (self.lo.0, interior.lo.1, interior.lo.2),
+                hi: (interior.lo.0, interior.hi.1, interior.hi.2),
+            }, // b
+            Cube {
+                lo: (interior.hi.0, interior.lo.1, interior.lo.2),
+                hi: (self.hi.0, interior.hi.1, interior.hi.2),
+            }, // c
+            Cube {
+                lo: (self.lo.0, self.lo.1, interior.lo.2),
+                hi: (self.hi.0, interior.lo.1, interior.hi.2),
+            }, // d
+        ]
+    }
+
+    fn remove_overlap(&self, other: &Cube) -> Vec<Cube> {
+        let overlap_lo = (
+            self.lo.0.max(other.lo.0),
+            self.lo.1.max(other.lo.1),
+            self.lo.2.max(other.lo.2),
+        );
+        let overlap_hi = (
+            self.hi.0.min(other.hi.0),
+            self.hi.1.min(other.hi.1),
+            self.hi.2.min(other.hi.2),
+        );
+        let overlap = Cube { lo: overlap_lo, hi: overlap_hi };
+        println!("overlap of {:?} and {:?} = {:?}", self, other, overlap);
+        // now how to remove it?
+        Vec::new()
+    }
+}
+
+// shout out to https://stackoverflow.com/a/12771129/12903251
 fn part2(steps: &[Step]) -> i64 {
-    let mut grid = Grid::new();
-    apply_all(steps.iter(), &mut grid, None);
-    grid.len() as i64
+    let mut cubes = HashSet::from([steps[0].cube()]);
+    let mut q: Vec<Step> = steps.iter().cloned().collect();
+    'outer: while let Some(step) = q.pop() {
+        let cube = step.cube();
+        let mut add = HashSet::new();
+        let mut remove = HashSet::new();
+        for prev in &cubes {
+            if cube.exclusive(prev) {
+                continue;
+            } else if prev.contains(&cube) {
+                continue 'outer;
+            } else if cube.contains(prev) {
+                let exterior = cube.remove_interior(prev);
+                q.extend(exterior.into_iter().map(|cube| Step {
+                    cmd: step.cmd,
+                    lo: cube.lo,
+                    hi: cube.hi,
+                }));
+                if step.cmd == Command::Off {
+                    remove.insert(prev.clone());
+                }
+            } else {
+                let prev_rest = prev.remove_overlap(&cube);
+                let cube_rest = cube.remove_overlap(prev);
+                if step.cmd == Command::Off {
+                    remove.insert(prev.clone());
+                    add.extend(prev_rest.into_iter());
+                }
+                q.extend(cube_rest.into_iter().map(|cube| Step {
+                    cmd: step.cmd,
+                    lo: cube.lo,
+                    hi: cube.hi,
+                }));
+            }
+        }
+        cubes.extend(add.into_iter());
+        cubes.retain(|cube| !remove.contains(cube));
+    }
+    println!("{:?}", cubes.iter().next());
+    cubes.iter().map(Cube::volume).sum()
 }
 
 fn main() {
