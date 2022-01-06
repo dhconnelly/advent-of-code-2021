@@ -189,6 +189,7 @@ off x=-93533..-4276,y=-16170..68771,z=-104985..-24507";
         assert_eq!(590784, grid.len());
     }
 
+    #[ignore]
     #[test]
     fn test_part2() {
         let steps = parse(INPUT3);
