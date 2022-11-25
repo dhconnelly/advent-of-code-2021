@@ -43,12 +43,41 @@ std::ostream& operator<<(std::ostream& os, const Grid& g) {
 
 using pt = std::pair<int, int>;
 
+enum class Dir {
+    East,
+    South,
+};
+
+pt nbr(pt cur, Dir dir, const Grid& g) {
+    if (dir == Dir::South) return {(cur.first + 1) % g.size(), cur.second};
+    if (dir == Dir::East) return {cur.first, (cur.second + 1) % g[0].size()};
+    die("empty can't move");
+}
+
 struct Fish {
     std::vector<pt> east;
     std::vector<pt> south;
 };
 
-void step(Grid& g, Grid& tmp, Fish& fish) {}
+void step_herd(Grid& cur, Grid& next, std::vector<pt>& fish, Dir dir) {
+    for (auto& [row, col] : fish) {
+        Tile cur_tile = cur[row][col];
+        const auto& [nbr_row, nbr_col] = nbr({row, col}, dir, cur);
+        if (cur[nbr_row][nbr_col] != Tile::Empty) continue;
+        next[row][col] = Tile::Empty;
+        next[nbr_row][nbr_col] = cur_tile;
+        row = nbr_row;
+        col = nbr_col;
+    }
+}
+
+void step(Grid& cur, Grid& next, Fish& fish) {
+    next = cur;
+    step_herd(cur, next, fish.east, Dir::East);
+    cur = next;
+    step_herd(cur, next, fish.south, Dir::South);
+    cur = next;
+}
 
 Fish find_fish(const Grid& g) {
     Fish fish;
@@ -69,17 +98,13 @@ int main(int argc, char* argv[]) {
     auto g = read_grid(argv[1]);
     auto tmp = g;
     auto fish = find_fish(g);
-    std::cout << "east:\n";
-    for (const auto& [row, col] : fish.east)
-        std::cout << row << ',' << col << '\n';
-    std::cout << "south:\n";
-    for (const auto& [row, col] : fish.south)
-        std::cout << row << ',' << col << '\n';
-    std::cout << g;
-    for (int i = 1; i <= 4; i++) {
-        std::cout << "After " << i << " steps:\n";
+    for (int i = 1;; i++) {
+        auto snapshot = g;
         step(g, tmp, fish);
-        std::cout << g;
+        if (g == snapshot) {
+            std::cout << i << std::endl;
+            break;
+        }
     }
     return 0;
 }
