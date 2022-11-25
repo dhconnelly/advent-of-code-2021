@@ -29,9 +29,7 @@ Grid read_grid(const std::string_view path) {
         }));
 }
 
-int main(int argc, char* argv[]) {
-    if (argc != 2) die("usage: day25 <input>");
-    auto g = read_grid(argv[1]);
+std::ostream& operator<<(std::ostream& os, const Grid& g) {
     for (const auto& row : g) {
         for (const auto& col : row) {
             std::cout << (col == Tile::Down    ? 'v'
@@ -39,6 +37,49 @@ int main(int argc, char* argv[]) {
                                                : '.');
         }
         std::cout << '\n';
+    }
+    return std::cout;
+}
+
+using pt = std::pair<int, int>;
+
+struct Fish {
+    std::vector<pt> east;
+    std::vector<pt> south;
+};
+
+void step(Grid& g, Grid& tmp, Fish& fish) {}
+
+Fish find_fish(const Grid& g) {
+    Fish fish;
+    for (int row = 0; row < g.size(); row++) {
+        for (int col = 0; col < g[row].size(); col++) {
+            switch (g[row][col]) {
+                case Tile::Down: fish.south.emplace_back(row, col); break;
+                case Tile::Right: fish.east.emplace_back(row, col); break;
+                case Tile::Empty: break;
+            }
+        }
+    }
+    return fish;
+}
+
+int main(int argc, char* argv[]) {
+    if (argc != 2) die("usage: day25 <input>");
+    auto g = read_grid(argv[1]);
+    auto tmp = g;
+    auto fish = find_fish(g);
+    std::cout << "east:\n";
+    for (const auto& [row, col] : fish.east)
+        std::cout << row << ',' << col << '\n';
+    std::cout << "south:\n";
+    for (const auto& [row, col] : fish.south)
+        std::cout << row << ',' << col << '\n';
+    std::cout << g;
+    for (int i = 1; i <= 4; i++) {
+        std::cout << "After " << i << " steps:\n";
+        step(g, tmp, fish);
+        std::cout << g;
     }
     return 0;
 }
