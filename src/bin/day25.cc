@@ -3,89 +3,68 @@
 
 #include "util.h"
 
-enum class Tile {
-    Right,
-    Down,
-    Empty,
-};
+enum class Tile { Right, Down, Empty };
+enum class Dir { East, South };
 
 using Grid = std::vector<std::vector<Tile>>;
+using Pt = std::pair<int, int>;
 
-Tile parse_tile(char ch) {
-    switch (ch) {
-        case '>': return Tile::Right;
-        case 'v': return Tile::Down;
-        case '.': return Tile::Empty;
-    }
-    die("invalid tile");
-}
-
-Grid read_grid(const std::string_view path) {
-    return parse_lines(
-        path, std::function([](std::string_view line) -> std::vector<Tile> {
-            std::vector<Tile> tiles;
-            for (char ch : line) tiles.push_back(parse_tile(ch));
-            return tiles;
-        }));
-}
-
-std::ostream& operator<<(std::ostream& os, const Grid& g) {
-    for (const auto& row : g) {
-        for (const auto& col : row) {
-            std::cout << (col == Tile::Down    ? 'v'
-                          : col == Tile::Right ? '>'
-                                               : '.');
-        }
-        std::cout << '\n';
-    }
-    return std::cout;
-}
-
-using pt = std::pair<int, int>;
-
-enum class Dir {
-    East,
-    South,
+struct Fish {
+    Pt pt;
+    Dir dir;
 };
 
-pt nbr(pt cur, Dir dir, const Grid& g) {
-    if (dir == Dir::South) return {(cur.first + 1) % g.size(), cur.second};
-    if (dir == Dir::East) return {cur.first, (cur.second + 1) % g[0].size()};
+Grid read_grid(const std::string_view path) {
+    auto parse_tile = [](char ch) {
+        switch (ch) {
+            case '>': return Tile::Right;
+            case 'v': return Tile::Down;
+            case '.': return Tile::Empty;
+        }
+        die("invalid tile");
+    };
+    auto parse_line = [=](const std::string_view line) {
+        std::vector<Tile> tiles;
+        for (char ch : line) tiles.push_back(parse_tile(ch));
+        return tiles;
+    };
+    return parse_lines(path, std::function(parse_line));
+}
+
+Pt nbr_pt(const Grid& g, const Fish& fish) {
+    const auto& [row, col] = fish.pt;
+    if (fish.dir == Dir::South) return {(row + 1) % g.size(), col};
+    if (fish.dir == Dir::East) return {row, (col + 1) % g[0].size()};
     die("empty can't move");
 }
 
-struct Fish {
-    std::vector<pt> east;
-    std::vector<pt> south;
-};
-
-void step_herd(Grid& cur, Grid& next, std::vector<pt>& fish, Dir dir) {
-    for (auto& [row, col] : fish) {
-        Tile cur_tile = cur[row][col];
-        const auto& [nbr_row, nbr_col] = nbr({row, col}, dir, cur);
+void step_herd(Grid& cur, Grid& next, std::vector<Fish>& fish, Dir dir) {
+    for (auto& fish : fish) {
+        if (fish.dir != dir) continue;
+        auto& [row, col] = fish.pt;
+        const auto& [nbr_row, nbr_col] = nbr_pt(cur, fish);
         if (cur[nbr_row][nbr_col] != Tile::Empty) continue;
-        next[row][col] = Tile::Empty;
-        next[nbr_row][nbr_col] = cur_tile;
+        std::swap(next[row][col], next[nbr_row][nbr_col]);
         row = nbr_row;
         col = nbr_col;
     }
 }
 
-void step(Grid& cur, Grid& next, Fish& fish) {
+void step(Grid& cur, Grid& next, std::vector<Fish>& fish) {
     next = cur;
-    step_herd(cur, next, fish.east, Dir::East);
+    step_herd(cur, next, fish, Dir::East);
     cur = next;
-    step_herd(cur, next, fish.south, Dir::South);
-    cur = next;
+    step_herd(cur, next, fish, Dir::South);
+    cur.swap(next);
 }
 
-Fish find_fish(const Grid& g) {
-    Fish fish;
-    for (int row = 0; row < g.size(); row++) {
-        for (int col = 0; col < g[row].size(); col++) {
-            switch (g[row][col]) {
-                case Tile::Down: fish.south.emplace_back(row, col); break;
-                case Tile::Right: fish.east.emplace_back(row, col); break;
+std::vector<Fish> find_fish(const Grid& g) {
+    std::vector<Fish> fish;
+    for (int r = 0; r < g.size(); r++) {
+        for (int c = 0; c < g[r].size(); c++) {
+            switch (g[r][c]) {
+                case Tile::Down: fish.push_back({{r, c}, Dir::South}); break;
+                case Tile::Right: fish.push_back({{r, c}, Dir::East}); break;
                 case Tile::Empty: break;
             }
         }
