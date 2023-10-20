@@ -1,11 +1,19 @@
 # advent-of-code-2021
 
-solutions in rust
-
-## usage
+for solutions in rust (days 1-21 and 25):
 
     cargo run --bin <day> <input_path>
 
 for example:
 
     cargo run --bin day1 inputs/day1.txt
+
+for solutions in c++ (days 22-24):
+
+    cmake -S. -Bout -DCMAKE_EXPORT_COMPILE_COMMANDS=1
+    cmake --build out
+    ./out/dayN input_path
+
+for example:
+
+    ./out/day24 inputs/day24.txt
