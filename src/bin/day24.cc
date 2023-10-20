@@ -196,6 +196,7 @@ struct expr {
     virtual std::unique_ptr<expr> eval(
         const std::unordered_map<char, std::unique_ptr<expr>>& es) const = 0;
     virtual std::unique_ptr<expr> clone() const = 0;
+    virtual std::optional<int64_t> val() const = 0;
 };
 
 using exprs = std::unordered_map<char, std::unique_ptr<expr>>;
@@ -210,6 +211,7 @@ struct var_expr : public expr {
     std::unique_ptr<expr> eval(const exprs& es) const override {
         return es.at(var)->clone();
     }
+    std::optional<int64_t> val() const override { return {}; }
 };
 
 struct lit_expr : public expr {
@@ -222,22 +224,22 @@ struct lit_expr : public expr {
     std::unique_ptr<expr> eval(const exprs& es) const override {
         return clone();
     };
+    std::optional<int64_t> val() const override { return value; }
 };
 
 struct inp_expr : public expr {
     static int next_index;
     int index;
     inp_expr() : index(next_index++) {}
-    inp_expr(int index) : index(next_index) {}
-    std::string str() const override {
-        return "input" + std::to_string(index) + "()";
-    }
+    inp_expr(int index) : index(index) {}
+    std::string str() const override { return "input" + std::to_string(index); }
     std::unique_ptr<expr> clone() const override {
         return std::make_unique<inp_expr>(index);
     }
     std::unique_ptr<expr> eval(const exprs& es) const override {
         return clone();
     };
+    std::optional<int64_t> val() const override { return {}; }
 };
 
 int inp_expr::next_index = 0;
@@ -248,15 +250,54 @@ struct bin_expr : public expr {
     char op;
     std::unique_ptr<expr> left, right;
     std::string str() const override {
-        return '(' + left->str() + op + right->str() + ')';
+        return '(' + left->str() + (op == '=' ? "==" : std::string(1, op)) +
+               right->str() + ')';
     }
     std::unique_ptr<expr> clone() const override {
         return std::make_unique<bin_expr>(op, left->clone(), right->clone());
     }
     std::unique_ptr<expr> eval(const exprs& es) const override {
-        return std::make_unique<bin_expr>(op, left->eval(es), right->eval(es));
+        return std::make_unique<bin_expr>(op, left->eval(es), right->eval(es))
+            ->simplify();
     };
+    std::optional<int64_t> val() const override { return {}; }
+    std::unique_ptr<expr> simplify() const;
 };
+
+int64_t evaluate(char op, int64_t left, int64_t right) { return 0; }
+
+std::unique_ptr<expr> bin_expr::simplify() const {
+    auto maybe_lhs = left->val(), maybe_rhs = right->val();
+    if (maybe_lhs.has_value() && maybe_rhs.has_value()) {
+        return std::make_unique<lit_expr>(evaluate(op, *maybe_lhs, *maybe_rhs));
+    }
+
+    if (op == '*') {
+        if (maybe_lhs.has_value() && maybe_lhs.value() == 0) {
+            return std::make_unique<lit_expr>(0);
+        }
+        if (maybe_rhs.has_value() && maybe_rhs.value() == 0) {
+            return std::make_unique<lit_expr>(0);
+        }
+        if (maybe_rhs.has_value() && *maybe_rhs == 1) {
+            return left->clone();
+        }
+        if (maybe_lhs.has_value() && *maybe_lhs == 1) {
+            return right->clone();
+        }
+    }
+
+    if (op == '+') {
+        if (maybe_lhs.has_value() && maybe_lhs.value() == 0) {
+            return right->clone();
+        }
+        if (maybe_rhs.has_value() && maybe_rhs.value() == 0) {
+            return left->clone();
+        }
+    }
+
+    return clone();
+}
 
 struct stmt {
     char lhs;
@@ -333,9 +374,7 @@ exprs decompile(const std::vector<instr>& prog) {
     es['y'] = std::make_unique<lit_expr>(0);
     es['z'] = std::make_unique<lit_expr>(0);
     for (const auto& stmt : decompile1(prog)) {
-        auto e = eval(*stmt.rhs, es);
-        std::cout << "applying: " << stmt << '\n';
-        es[stmt.lhs] = std::move(e);
+        es[stmt.lhs] = eval(*stmt.rhs, es);
     }
     return es;
 }
@@ -392,9 +431,8 @@ void run_tests() {
 void solve(const std::string& input) {
     auto prog = parse(input);
     auto exprs = decompile(prog);
-    for (const auto& [var, expr] : exprs) {
-        std::cout << var << '=' << *expr << '\n';
-    }
+    auto z = exprs['z']->clone();
+    std::cout << "0 == " << *z << '\n';
 }
 
 int main(int argc, char* argv[]) {
