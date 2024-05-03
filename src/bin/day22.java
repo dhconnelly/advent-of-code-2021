@@ -1,3 +1,4 @@
+// usage: java day22.java <file>
 package bin;
 
 import static java.lang.Long.parseLong;
@@ -9,13 +10,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Optional;
-import java.util.Queue;
-import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -31,11 +29,6 @@ public class day22 {
     }
 
     record Interval(long from, long to) {
-        @Override
-        public String toString() {
-            return "[%d, %d]".formatted(from, to);
-        }
-
         Optional<Interval> intersection(Interval other) {
             long from = Long.max(this.from, other.from);
             long to = Long.min(this.to, other.to);
@@ -64,11 +57,6 @@ public class day22 {
     }
 
     record Box(Interval x, Interval y, Interval z) {
-        @Override
-        public String toString() {
-            return "{x=%s, y=%s, z=%s}".formatted(x, y, z);
-        }
-
         long volume() {
             return (x.to - x.from + 1) * (y.to - y.from + 1) * (z.to - z.from + 1);
         }
@@ -86,9 +74,13 @@ public class day22 {
                     : Optional.of(new Box(x.get(), y.get(), z.get()));
         }
 
+        boolean hasIntersection(Box other) {
+            return intersection(other).isPresent();
+        }
+
         List<Box> splitAround(Box other) {
             if (this.equals(other)) {
-                return List.of(other);
+                return List.of();
             }
             return this.intersection(other).map(common -> {
                 var splitsX = x.splitAround(common.x);
@@ -127,11 +119,54 @@ public class day22 {
                     }
                 }
                 return splits;
-            }).orElseGet(() -> List.of(this));
+            }).orElseGet(() -> List.of());
         }
     }
 
     record LitBox(boolean on, Box box) {
+    }
+
+    static List<Box> process(List<LitBox> litBoxes) {
+        List<Box> ons = new LinkedList<>();
+        litBoxes.forEach(litBox -> {
+            if (litBox.on) {
+                var q = new ArrayDeque<Box>();
+                q.add(litBox.box);
+                while (!q.isEmpty()) {
+                    Box box = q.poll();
+                    ons.stream().filter(box::hasIntersection).findAny().ifPresentOrElse(on -> {
+                        ons.remove(on);
+                        q.addAll(on.splitAround(box));
+                        q.addAll(box.splitAround(on));
+                        q.add(box.intersection(on).get());
+                    }, () -> ons.add(box));
+                }
+            } else {
+                for (ListIterator<Box> it = ons.listIterator(); it.hasNext();) {
+                    Box on = it.next();
+                    if (on.hasIntersection(litBox.box)) {
+                        it.remove();
+                        on.splitAround(litBox.box).forEach(it::add);
+                    }
+                }
+            }
+        });
+        return ons;
+    }
+
+    static Optional<Long> volume(List<Box> boxes) {
+        return boxes.stream().map(Box::volume).reduce(Long::sum);
+    }
+
+    static long part1(List<LitBox> litBoxes) {
+        Box outer = new Box(new Interval(-50, 50), new Interval(-50, 50), new Interval(-50, 50));
+        List<Box> on = process(litBoxes.stream().filter(lb -> outer.contains(lb.box)).toList());
+        return volume(on).get();
+    }
+
+    static long part2(List<LitBox> litBoxes) {
+        List<Box> on = process(litBoxes);
+        return volume(on).get();
     }
 
     static final Pattern LINE = Pattern
@@ -141,7 +176,7 @@ public class day22 {
         return lines.map(line -> {
             var m = LINE.matcher(line);
             if (!m.matches()) {
-                die(new IllegalArgumentException("invalid input line: %s".formatted(line)));
+                die("invalid input line: %s".formatted(line));
             }
             return new LitBox(
                     m.group(1).equals("on"),
@@ -151,69 +186,14 @@ public class day22 {
         });
     }
 
-    static Optional<Long> volume(List<Box> boxes) {
-        return boxes.stream().map(Box::volume).reduce(Long::sum);
-    }
-
-    static List<Box> process(Stream<LitBox> litBoxes) {
-        Box outer = new Box(new Interval(-50, 50), new Interval(-50, 50), new Interval(-50, 50));
-        List<Box> ons = new LinkedList<>();
-        // litBoxes = litBoxes.filter(litBox -> outer.contains(litBox.box));
-        litBoxes.forEach(litBox -> {
-            // System.out.printf("processing: %s\n", litBox);
-            if (litBox.on) {
-                var q = new ArrayDeque<Box>();
-                q.add(litBox.box);
-                while (!q.isEmpty()) {
-                    Box box = q.poll();
-                    ons.removeIf(on -> box.contains(on));
-                    if (ons.stream().anyMatch(on -> on.contains(box))) {
-                        continue;
-                    }
-                    Optional<Box> intersects = ons.stream().filter(on -> on.intersection(box).isPresent()).findAny();
-                    intersects.ifPresentOrElse(on -> {
-                        ons.remove(on);
-                        q.addAll(on.splitAround(box));
-                        q.addAll(box.splitAround(on));
-                        q.add(box.intersection(on).get());
-                    }, () -> {
-                        ons.add(box);
-                    });
-                }
-            } else {
-                ListIterator<Box> it = ons.listIterator();
-                while (it.hasNext()) {
-                    Box on = it.next();
-                    if (on.intersection(litBox.box).isEmpty()) {
-                        continue;
-                    }
-                    if (litBox.box.contains(on)) {
-                        it.remove();
-                        continue;
-                    }
-                    // System.out.printf("off intersection, removing %s\n", on);
-                    it.remove();
-                    for (Box split : on.splitAround(litBox.box)) {
-                        // System.out.printf("adding split: %s\n", split);
-                        it.add(split);
-                    }
-                }
-            }
-            // System.out.printf("new ons: %s, volume %s\n", ons, volume(ons));
-            // System.out.println(volume(ons).get());
-        });
-        return ons;
-    }
-
     public static void main(String[] args) {
         if (args.length != 1) {
             die("usage: java day22.java <file>");
         }
         try (InputStream input = Files.newInputStream(Path.of(args[0]))) {
-            Stream<LitBox> litBoxes = parse(new BufferedReader(new InputStreamReader(input)).lines());
-            List<Box> ons = process(litBoxes);
-            Optional<Long> sum = ons.stream().map(Box::volume).reduce(Long::sum);
-            System.out.println(sum);
+            List<LitBox> litBoxes = parse(new BufferedReader(new InputStreamReader(input)).lines()).toList();
+            System.out.println(part1(litBoxes));
+            System.out.println(part2(litBoxes));
         } catch (Exception e) {
             die(e);
         }
