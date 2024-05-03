@@ -1,6 +1,6 @@
 package bin;
 
-import static java.lang.Integer.parseInt;
+import static java.lang.Long.parseLong;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -30,15 +30,15 @@ public class day22 {
         System.exit(1);
     }
 
-    record Interval(int from, int to) {
+    record Interval(long from, long to) {
         @Override
         public String toString() {
             return "[%d, %d]".formatted(from, to);
         }
 
         Optional<Interval> intersection(Interval other) {
-            int from = Integer.max(this.from, other.from);
-            int to = Integer.min(this.to, other.to);
+            long from = Long.max(this.from, other.from);
+            long to = Long.min(this.to, other.to);
             return (from > to) ? Optional.empty() : Optional.of(new Interval(from, to));
         }
 
@@ -69,7 +69,7 @@ public class day22 {
             return "{x=%s, y=%s, z=%s}".formatted(x, y, z);
         }
 
-        int volume() {
+        long volume() {
             return (x.to - x.from + 1) * (y.to - y.from + 1) * (z.to - z.from + 1);
         }
 
@@ -145,20 +145,20 @@ public class day22 {
             }
             return new LitBox(
                     m.group(1).equals("on"),
-                    new Box(new Interval(parseInt(m.group(2)), parseInt(m.group(3))),
-                            new Interval(parseInt(m.group(4)), parseInt(m.group(5))),
-                            new Interval(parseInt(m.group(6)), parseInt(m.group(7)))));
+                    new Box(new Interval(parseLong(m.group(2)), parseLong(m.group(3))),
+                            new Interval(parseLong(m.group(4)), parseLong(m.group(5))),
+                            new Interval(parseLong(m.group(6)), parseLong(m.group(7)))));
         });
     }
 
-    static Optional<Integer> volume(List<Box> boxes) {
-        return boxes.stream().map(Box::volume).reduce(Integer::sum);
+    static Optional<Long> volume(List<Box> boxes) {
+        return boxes.stream().map(Box::volume).reduce(Long::sum);
     }
 
     static List<Box> process(Stream<LitBox> litBoxes) {
         Box outer = new Box(new Interval(-50, 50), new Interval(-50, 50), new Interval(-50, 50));
         List<Box> ons = new LinkedList<>();
-        litBoxes = litBoxes.filter(litBox -> outer.contains(litBox.box));
+        // litBoxes = litBoxes.filter(litBox -> outer.contains(litBox.box));
         litBoxes.forEach(litBox -> {
             // System.out.printf("processing: %s\n", litBox);
             if (litBox.on) {
@@ -212,7 +212,7 @@ public class day22 {
         try (InputStream input = Files.newInputStream(Path.of(args[0]))) {
             Stream<LitBox> litBoxes = parse(new BufferedReader(new InputStreamReader(input)).lines());
             List<Box> ons = process(litBoxes);
-            Optional<Integer> sum = ons.stream().map(Box::volume).reduce(Integer::sum);
+            Optional<Long> sum = ons.stream().map(Box::volume).reduce(Long::sum);
             System.out.println(sum);
         } catch (Exception e) {
             die(e);
