@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
+#include <string.h>
 
 /* static const int ROOM_COLS[4] = {2, 4, 6, 8}; */
 static const int HALLWAY_LEN = 11;
@@ -37,6 +37,44 @@ typedef struct {
     /* amps[N] has the room_depth positions for amp type N */
     pos* amps[NUM_AMPS];
 } state;
+
+/***********************************/
+/* k&r hash table                  */
+
+#define HASHSIZE 101
+
+unsigned hash(char* s) {
+    unsigned hashval;
+    for (hashval = 0; *s != '\0'; s++) hashval = *s + 31 * hashval;
+    return hashval % HASHSIZE;
+}
+
+typedef struct nlist {
+    struct nlist* next;
+    char* key;
+    int64_t value;
+} nlist;
+
+typedef nlist* hashset[HASHSIZE];
+
+int64_t* lookup(hashset set, char* key) {
+    nlist* np;
+    for (np = set[hash(key)]; np != NULL; np = np->next) {
+        if (strcmp(key, np->key) == 0) return &np->value;
+    }
+    return NULL;
+}
+
+void insert(hashset set, char* key, int64_t value) {
+    nlist* np = malloc(sizeof(nlist));
+    unsigned hashval = hash(key);
+    np->next = set[hashval];
+    set[hashval] = np;
+    np->key = strdup(key);
+    np->value = value;
+}
+
+/***********************************/
 
 state make_state(int room_depth) {
     state st;
@@ -121,17 +159,6 @@ void parse_state(state* st, FILE* input) {
     assert(fgets(line, LINE_LEN, input) != NULL);
 }
 
-int is_finished(state* st) {
-    int i, j;
-    for (i = 0; i < NUM_AMPS; i++) {
-        for (j = 0; j < st->room_depth; j++) {
-            pos pos = st->amps[i][j];
-            if (pos.where != i) return 0;
-        }
-    }
-    return 1;
-}
-
 int room_all_of_type(state* st, int amp_idx) {
     amp want = AMPS[amp_idx];
     int depth;
@@ -142,48 +169,6 @@ int room_all_of_type(state* st, int amp_idx) {
         }
     }
     return 1;
-}
-
-int64_t minimize(state*);
-
-int64_t minimize_from(state* st, int amp_idx, int amp_depth, pos dest, int dist,
-                      int64_t min_so_far) {
-    pos cur = st->amps[amp_idx][amp_depth];
-    st->amps[amp_idx][amp_depth] = dest;
-    if (cur.where >= 0) {
-        st->rooms[cur.where][cur.idx] = NONE;
-    } else {
-        st->hallway[cur.idx] = NONE;
-    }
-    if (dest.where >= 0) {
-        st->rooms[dest.where][dest.idx] = AMPS[amp_idx];
-    } else {
-        st->hallway[dest.idx] = AMPS[amp_idx];
-    }
-
-    /*sleep(1);
-    print_state(st);*/
-
-    int64_t energy_cost = AMP_ENERGY[amp_idx] * dist;
-    int64_t recursive_cost = minimize(st);
-    int64_t total_cost = energy_cost + recursive_cost;
-    if (recursive_cost >= 0 && total_cost < min_so_far) {
-        min_so_far = total_cost;
-    }
-
-    if (cur.where >= 0) {
-        st->rooms[cur.where][cur.idx] = AMPS[amp_idx];
-    } else {
-        st->hallway[cur.idx] = AMPS[amp_idx];
-    }
-    if (dest.where >= 0) {
-        st->rooms[dest.where][dest.idx] = NONE;
-    } else {
-        st->hallway[dest.idx] = NONE;
-    }
-    st->amps[amp_idx][amp_depth] = cur;
-
-    return min_so_far;
 }
 
 int64_t shortest_path(state* st, pos cur, pos dest) {
@@ -220,9 +205,57 @@ int64_t shortest_path(state* st, pos cur, pos dest) {
     return dist;
 }
 
-int64_t minimize(state* st) {
-    if (is_finished(st)) return 0;
+void set(state* st, pos p, amp amp) {
+    if (p.where >= 0)
+        st->rooms[p.where][p.idx] = amp;
+    else
+        st->hallway[p.idx] = amp;
+}
 
+int64_t minimize(state*);
+
+int64_t minimize_from(state* st, int amp_idx, int amp_depth, pos dest, int dist,
+                      int64_t min_so_far) {
+    pos cur = st->amps[amp_idx][amp_depth];
+    st->amps[amp_idx][amp_depth] = dest;
+    set(st, cur, NONE);
+    set(st, dest, AMPS[amp_idx]);
+
+    int64_t energy_cost = AMP_ENERGY[amp_idx] * dist;
+    int64_t recursive_cost = minimize(st);
+    int64_t total_cost = energy_cost + recursive_cost;
+    if (recursive_cost >= 0 && total_cost < min_so_far) {
+        min_so_far = total_cost;
+    }
+
+    set(st, cur, AMPS[amp_idx]);
+    set(st, dest, NONE);
+    st->amps[amp_idx][amp_depth] = cur;
+    return min_so_far;
+}
+
+hashset global_set;
+static const int KEY_LEN = 7 * 8 + 1;
+typedef char state_key[KEY_LEN];
+
+void k(state* st, state_key key) {
+    int i = 0, amp_idx, amp_depth;
+    for (amp_idx = 0; amp_idx < NUM_AMPS; amp_idx++) {
+        for (amp_depth = 0; amp_depth < st->room_depth; amp_depth++) {
+            pos p = st->amps[amp_idx][amp_depth];
+            i += sprintf(key + i, "[%02d,%02d]", p.where, p.idx);
+        }
+    }
+    key[KEY_LEN - 1] = '\0';
+}
+
+int64_t minimize(state* st) {
+    char key[KEY_LEN];
+    k(st, key);
+    int64_t* cached;
+    if ((cached = lookup(global_set, key)) != NULL) return *cached;
+
+    int in_place = 0;
     int64_t min_cost = INT64_MAX;
     int amp_idx, amp_depth;
     for (amp_idx = 0; amp_idx < NUM_AMPS; amp_idx++) {
@@ -233,6 +266,7 @@ int64_t minimize(state* st) {
             if (cur.where == amp_idx && can_go_home) {
                 /* in its own room and can stay there. do nothing */
                 /* invariant: this implies it's as deep as it can go */
+                in_place++;
                 continue;
             }
 
@@ -242,11 +276,6 @@ int64_t minimize(state* st) {
                 for (depth = st->room_depth - 1; depth >= 0; depth--) {
                     pos dest = {amp_idx, depth};
                     if ((dist = shortest_path(st, cur, dest)) > 0) {
-                        /*
-                        printf("moving %c from %d %d to %d %d dist %d\n",
-                               AMPS[amp_idx], cur.where, cur.idx, dest.where,
-                               dest.idx, dist);
-                               */
                         min_cost = minimize_from(st, amp_idx, amp_depth, dest,
                                                  dist, min_cost);
                         break;
@@ -260,11 +289,6 @@ int64_t minimize(state* st) {
                     int col = AVAIL_COLS[i];
                     pos dest = {-1, col};
                     if ((dist = shortest_path(st, cur, dest)) > 0) {
-                        /*
-                        printf("moving %c from %d %d to %d %d dist %d\n",
-                               AMPS[amp_idx], cur.where, cur.idx, dest.where,
-                               dest.idx, dist);
-                               */
                         min_cost = minimize_from(st, amp_idx, amp_depth, dest,
                                                  dist, min_cost);
                     }
@@ -273,7 +297,10 @@ int64_t minimize(state* st) {
         }
     }
 
-    return min_cost < INT64_MAX ? min_cost : -1;
+    int done = in_place == 4 * st->room_depth;
+    int64_t cost = done ? 0 : min_cost < INT64_MAX ? min_cost : -1;
+    insert(global_set, key, cost);
+    return cost;
 }
 
 int main(int argc, char* argv[]) {
@@ -290,7 +317,6 @@ int main(int argc, char* argv[]) {
 
     state st = make_state(2);
     parse_state(&st, input);
-    print_state(&st);
 
     printf("%lld\n", minimize(&st));
 
