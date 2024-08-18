@@ -19,8 +19,6 @@ typedef enum {
 
 static const int AMPS[4] = {A, B, C, D};
 static const int AMP_COLS[4] = {2, 4, 6, 8};
-static const int NUM_AVAIL_COLS = 7;
-static const int AVAIL_COLS[NUM_AVAIL_COLS] = {0, 1, 3, 5, 7, 9, 10};
 static const int64_t AMP_ENERGY[4] = {1, 10, 100, 1000};
 
 typedef struct {
@@ -171,6 +169,8 @@ int room_all_of_type(state* st, int amp_idx) {
     return 1;
 }
 
+int col_of(pos p) { return (p.where == -1) ? p.idx : AMP_COLS[p.where]; }
+
 int64_t shortest_path(state* st, pos cur, pos dest) {
     int64_t dist = 0;
 
@@ -184,8 +184,8 @@ int64_t shortest_path(state* st, pos cur, pos dest) {
     }
 
     /* in hallway: move to target column */
-    int cur_col = (cur.where == -1) ? cur.idx : AMP_COLS[cur.where];
-    int dest_col = (dest.where == -1) ? dest.idx : AMP_COLS[dest.where];
+    int cur_col = col_of(cur);
+    int dest_col = col_of(dest);
     int col_dir = (dest_col - cur_col) > 0 ? 1 : -1;
     int col;
     for (col = cur_col; col != dest_col; col += col_dir) {
@@ -206,10 +206,11 @@ int64_t shortest_path(state* st, pos cur, pos dest) {
 }
 
 void set(state* st, pos p, amp amp) {
-    if (p.where >= 0)
+    if (p.where >= 0) {
         st->rooms[p.where][p.idx] = amp;
-    else
+    } else {
         st->hallway[p.idx] = amp;
+    }
 }
 
 int64_t minimize(state*);
@@ -249,6 +250,14 @@ void k(state* st, state_key key) {
     key[KEY_LEN - 1] = '\0';
 }
 
+int is_amp_col(int cur_col) {
+    int i;
+    for (i = 0; i < NUM_AMPS; i++) {
+        if (cur_col == AMP_COLS[i]) return 1;
+    }
+    return 0;
+}
+
 int64_t minimize(state* st) {
     char key[KEY_LEN];
     k(st, key);
@@ -270,6 +279,7 @@ int64_t minimize(state* st) {
                 continue;
             }
 
+            /* TODO: we can know the deepest tile without searching */
             int dist;
             if (can_go_home) {
                 int depth;
@@ -283,15 +293,30 @@ int64_t minimize(state* st) {
                 }
             }
 
+            /* TODO: define order of visiting hallway squares */
+            /* TODO: we can know the deepest tile without searching */
             if (cur.where != -1) {
-                int i;
-                for (i = 0; i < NUM_AVAIL_COLS; i++) {
-                    int col = AVAIL_COLS[i];
+                int cur_col = col_of(cur);
+
+                /* go left until hitting an obstacle */
+                int col;
+                for (col = cur_col - 1; col >= 0; col--) {
+                    if (is_amp_col(col)) continue;
                     pos dest = {-1, col};
-                    if ((dist = shortest_path(st, cur, dest)) > 0) {
-                        min_cost = minimize_from(st, amp_idx, amp_depth, dest,
-                                                 dist, min_cost);
-                    }
+                    int dist = shortest_path(st, cur, dest);
+                    if (dist < 0) break;
+                    min_cost = minimize_from(st, amp_idx, amp_depth, dest, dist,
+                                             min_cost);
+                }
+
+                /* go right until hitting an obstacle */
+                for (col = cur_col + 1; col < HALLWAY_LEN; col++) {
+                    if (is_amp_col(col)) continue;
+                    pos dest = {-1, col};
+                    int dist = shortest_path(st, cur, dest);
+                    if (dist < 0) break;
+                    min_cost = minimize_from(st, amp_idx, amp_depth, dest, dist,
+                                             min_cost);
                 }
             }
         }
