@@ -258,6 +258,43 @@ int is_amp_col(int cur_col) {
     return 0;
 }
 
+int64_t search_room(state* st, int amp_idx, int amp_depth, int64_t min_cost) {
+    /* TODO: we can know the deepest tile without searching */
+    pos cur = st->amps[amp_idx][amp_depth];
+    /* go as deep as we can */
+    int depth;
+    for (depth = st->room_depth - 1; depth >= 0; depth--) {
+        pos dest = {amp_idx, depth};
+        int dist;
+        if ((dist = shortest_path(st, cur, dest)) > 0) {
+            min_cost =
+                minimize_from(st, amp_idx, amp_depth, dest, dist, min_cost);
+            break;
+        }
+    }
+    return min_cost;
+}
+
+int64_t search_hallway(state* st, int amp_idx, int amp_depth,
+                       int64_t min_cost) {
+    pos cur = st->amps[amp_idx][amp_depth];
+    int cur_col = col_of(cur);
+    /* go left and right until hitting an obstacle */
+    int dir;
+    for (dir = -1; dir <= 1; dir += 2) {
+        int col;
+        for (col = cur_col + dir; col >= 0 && col < HALLWAY_LEN; col += dir) {
+            if (is_amp_col(col)) continue;
+            pos dest = {-1, col};
+            int dist = shortest_path(st, cur, dest);
+            if (dist < 0) break;
+            min_cost =
+                minimize_from(st, amp_idx, amp_depth, dest, dist, min_cost);
+        }
+    }
+    return min_cost;
+}
+
 int64_t minimize(state* st) {
     char key[KEY_LEN];
     k(st, key);
@@ -279,37 +316,12 @@ int64_t minimize(state* st) {
                 continue;
             }
 
-            /* TODO: we can know the deepest tile without searching */
-            int dist;
             if (can_go_home) {
-                /* go as deep as we can */
-                int depth;
-                for (depth = st->room_depth - 1; depth >= 0; depth--) {
-                    pos dest = {amp_idx, depth};
-                    if ((dist = shortest_path(st, cur, dest)) > 0) {
-                        min_cost = minimize_from(st, amp_idx, amp_depth, dest,
-                                                 dist, min_cost);
-                        break;
-                    }
-                }
+                min_cost = search_room(st, amp_idx, amp_depth, min_cost);
             }
 
             if (cur.where != -1) {
-                /* go left and right until hitting an obstacle */
-                int cur_col = col_of(cur);
-                int dir;
-                for (dir = -1; dir <= 1; dir += 2) {
-                    int col;
-                    for (col = cur_col + dir; col >= 0 && col < HALLWAY_LEN;
-                         col += dir) {
-                        if (is_amp_col(col)) continue;
-                        pos dest = {-1, col};
-                        int dist = shortest_path(st, cur, dest);
-                        if (dist < 0) break;
-                        min_cost = minimize_from(st, amp_idx, amp_depth, dest,
-                                                 dist, min_cost);
-                    }
-                }
+                min_cost = search_hallway(st, amp_idx, amp_depth, min_cost);
             }
         }
     }
