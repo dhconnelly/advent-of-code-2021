@@ -124,7 +124,7 @@ void print_state(state* st) {
     putchar('\n');
 }
 
-void parse_state(state* st, FILE* input) {
+void parse_state(state* st, FILE* input, int room_depth) {
     char line[LINE_LEN];
     /* top wall */
     assert(fgets(line, LINE_LEN, input) != NULL);
@@ -132,8 +132,6 @@ void parse_state(state* st, FILE* input) {
     /* hallway */
     assert(fgets(line, LINE_LEN, input) != NULL);
 
-    /* input always has depth 2 */
-    int room_depth = 2;
     int i, j;
     int amp_count[NUM_AMPS];
     for (i = 0; i < NUM_AMPS; i++) {
@@ -236,10 +234,9 @@ int64_t minimize_from(state* st, int amp_idx, int amp_depth, pos dest, int dist,
 }
 
 hashset global_set;
-static const int KEY_LEN = 7 * 8 + 1;
-typedef char state_key[KEY_LEN];
+typedef char* state_key;
 
-void k(state* st, state_key key) {
+void k(state* st, state_key key, int key_len) {
     int i = 0, amp_idx, amp_depth;
     for (amp_idx = 0; amp_idx < NUM_AMPS; amp_idx++) {
         for (amp_depth = 0; amp_depth < st->room_depth; amp_depth++) {
@@ -247,7 +244,7 @@ void k(state* st, state_key key) {
             i += sprintf(key + i, "[%02d,%02d]", p.where, p.idx);
         }
     }
-    key[KEY_LEN - 1] = '\0';
+    key[key_len - 1] = '\0';
 }
 
 int is_amp_col(int cur_col) {
@@ -295,11 +292,16 @@ int64_t search_hallway(state* st, int amp_idx, int amp_depth,
     return min_cost;
 }
 
+int key_len(int room_depth) { return room_depth * 4 * 7 + 1; }
+
 int64_t minimize(state* st) {
-    char key[KEY_LEN];
-    k(st, key);
+    char* key = malloc(key_len(st->room_depth));
+    k(st, key, key_len(st->room_depth));
     int64_t* cached;
-    if ((cached = lookup(global_set, key)) != NULL) return *cached;
+    if ((cached = lookup(global_set, key)) != NULL) {
+        free(key);
+        return *cached;
+    }
 
     int in_place = 0;
     int64_t min_cost = INT64_MAX;
@@ -329,24 +331,25 @@ int64_t minimize(state* st) {
     int done = in_place == 4 * st->room_depth;
     int64_t cost = done ? 0 : min_cost < INT64_MAX ? min_cost : -1;
     insert(global_set, key, cost);
+    free(key);
     return cost;
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        printf("usage: day23 <file>\n");
+    if (argc != 3) {
+        printf("usage: day23 <file> <room_depth>\n");
         exit(1);
     }
 
+    int room_depth = atoi(argv[2]);
     FILE* input = fopen(argv[1], "r");
     if (input == NULL) {
         perror("can't open input file");
         exit(1);
     }
 
-    state st = make_state(2);
-    parse_state(&st, input);
-
+    state st = make_state(room_depth);
+    parse_state(&st, input, room_depth);
     printf("%lld\n", minimize(&st));
 
     return 0;
