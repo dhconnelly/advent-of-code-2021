@@ -79,28 +79,24 @@ typedef struct {
     param arg2;
 } instr;
 
-instr parse_instr(char* line) {
-    instr i;
-
+void parse_instr(instr* i, char* line) {
     /* parse opcode */
     char* sep = strstr(line, " ");
     assert(sep != NULL);
     *sep = '\0';
-    i.op = parse_opcode(line);
+    i->op = parse_opcode(line);
 
     /* parse arg1 */
     line = sep + 1;
     sep = strstr(line, " ");
     if (sep != NULL) *sep = '\0';
-    i.arg1 = line[0];
+    i->arg1 = line[0];
 
     /* parse arg2 if present */
     if (sep != NULL) {
         line = sep + 1;
-        i.arg2 = parse_param(line);
+        i->arg2 = parse_param(line);
     }
-
-    return i;
 }
 
 void print_instr(instr i) {
@@ -119,6 +115,17 @@ void print_instr(instr i) {
 }
 
 static const int MAXLINE = 32;
+static const int MAXINSTRS = 1024;
+
+int read_instrs(instr instrs[], FILE* input) {
+    char line[MAXLINE];
+    int i;
+    for (i = 0; i < MAXINSTRS && fgets(line, MAXLINE, input) != NULL; i++) {
+        if (line[0] == '\n' || line[0] == '\0') break;
+        parse_instr(&instrs[i], line);
+    }
+    return i;
+}
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
@@ -132,11 +139,12 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
-    char line[MAXLINE];
-    while (fgets(line, MAXLINE, input) != NULL) {
-        if (line[0] == '\n' || line[0] == '\0') break;
-        instr i = parse_instr(line);
-        print_instr(i);
+    instr instrs[MAXINSTRS];
+    int num_instrs = read_instrs(instrs, input);
+
+    int i;
+    for (i = num_instrs - 1; i >= 0; i--) {
+        print_instr(instrs[i]);
     }
 
     return 0;
