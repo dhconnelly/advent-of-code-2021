@@ -282,6 +282,7 @@ int64_t minimize(state* st) {
             /* TODO: we can know the deepest tile without searching */
             int dist;
             if (can_go_home) {
+                /* go as deep as we can */
                 int depth;
                 for (depth = st->room_depth - 1; depth >= 0; depth--) {
                     pos dest = {amp_idx, depth};
@@ -293,30 +294,21 @@ int64_t minimize(state* st) {
                 }
             }
 
-            /* TODO: define order of visiting hallway squares */
-            /* TODO: we can know the deepest tile without searching */
             if (cur.where != -1) {
+                /* go left and right until hitting an obstacle */
                 int cur_col = col_of(cur);
-
-                /* go left until hitting an obstacle */
-                int col;
-                for (col = cur_col - 1; col >= 0; col--) {
-                    if (is_amp_col(col)) continue;
-                    pos dest = {-1, col};
-                    int dist = shortest_path(st, cur, dest);
-                    if (dist < 0) break;
-                    min_cost = minimize_from(st, amp_idx, amp_depth, dest, dist,
-                                             min_cost);
-                }
-
-                /* go right until hitting an obstacle */
-                for (col = cur_col + 1; col < HALLWAY_LEN; col++) {
-                    if (is_amp_col(col)) continue;
-                    pos dest = {-1, col};
-                    int dist = shortest_path(st, cur, dest);
-                    if (dist < 0) break;
-                    min_cost = minimize_from(st, amp_idx, amp_depth, dest, dist,
-                                             min_cost);
+                int dir;
+                for (dir = -1; dir <= 1; dir += 2) {
+                    int col;
+                    for (col = cur_col + dir; col >= 0 && col < HALLWAY_LEN;
+                         col += dir) {
+                        if (is_amp_col(col)) continue;
+                        pos dest = {-1, col};
+                        int dist = shortest_path(st, cur, dest);
+                        if (dist < 0) break;
+                        min_cost = minimize_from(st, amp_idx, amp_depth, dest,
+                                                 dist, min_cost);
+                    }
                 }
             }
         }
